@@ -1348,211 +1348,269 @@ function moneyFlyAnimation(){
   overlay.appendChild(canvas);
   const ctx = canvas.getContext('2d');
 
-  // ── Wallet dimensions (centred at bottom-ish) ──
+  // ── Purse position (lower right-ish like reference) ──
   const WX = W / 2;
-  const WY = H * 0.72;
-  const WW = Math.min(W * 0.36, 130);
-  const WH = WW * 0.75;
+  const WY = H * 0.70;
+  const WW = Math.min(W * 0.42, 160);  // purse width
+  const WH = WW * 0.72;                 // purse height
 
-  // ── Bill dimensions ──
-  const BW = Math.min(W * 0.30, 110);
-  const BH = BW * 0.44;
+  // ── Bill dimensions (slimmer, like reference) ──
+  const BW = Math.min(W * 0.20, 78);
+  const BH = BW * 0.55;
 
-  // ── Bills config ──
+  // ── Bills config: launch sequence ──
   const billDefs = [
-    { delay: 28, vx: -1.8, vy: -2.2, drift: 0.04, rotSpeed: -0.008 },
-    { delay: 42, vx:  0.3, vy: -2.6, drift:-0.03, rotSpeed:  0.006 },
-    { delay: 58, vx:  2.0, vy: -2.0, drift: 0.05, rotSpeed: -0.005 },
+    { delay: 22, vx: -2.2, vy: -2.4, drift: 0.04, rotSpeed: -0.006, startRot: -0.25 },
+    { delay: 40, vx: -0.4, vy: -2.8, drift:-0.03, rotSpeed:  0.005, startRot:  0.1 },
+    { delay: 60, vx:  1.6, vy: -2.2, drift: 0.05, rotSpeed: -0.004, startRot: -0.15 },
   ];
 
   const bills = billDefs.map((def, i) => ({
     ...def,
-    x: WX + (i - 1) * BW * 0.25,
-    y: WY - WH * 0.2,
-    rot: (i - 1) * 0.18,
-    wingAngle: i * 1.2,
+    x: WX,
+    y: WY - WH * 0.15,
+    rot: def.startRot,
+    wingAngle: i * 1.4,
     opacity: 0,
-    phase: 'wait',  // wait → launch → fly → done
+    phase: 'wait',
     timer: 0,
-    launched: false,
   }));
 
   let globalTimer = 0;
-  // wallet open angle 0→1
   let walletOpen = 0;
-  let done = false;
 
-  // ── Draw a pastel winged bill ──
+  // ── Draw soft pale-blue wing (like reference) ──
+  function drawSoftWing(side, wAngle) {
+    const flap = Math.sin(wAngle) * 0.4;
+    ctx.save();
+    ctx.translate(side * BW * 0.42, -BH * 0.1);
+    ctx.rotate(side * (0.1 + flap));
+
+    // Main wing — soft pale blue, layered feather shape (no outline)
+    const wingColor = '#cfdee8';      // pale blue-gray
+    const wingDark  = '#b8cdd8';      // slightly deeper for layering
+
+    // Upper feather lobe
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(
+      side * BW * 0.4, -BH * 0.9,
+      side * BW * 0.95, -BH * 0.55
+    );
+    ctx.quadraticCurveTo(
+      side * BW * 0.75, -BH * 0.15,
+      side * BW * 0.5, 0
+    );
+    ctx.quadraticCurveTo(
+      side * BW * 0.25, 0.05 * BH,
+      0, 0
+    );
+    ctx.fillStyle = wingColor;
+    ctx.fill();
+
+    // Middle feather (slightly darker, smaller)
+    ctx.beginPath();
+    ctx.moveTo(side * BW * 0.05, BH * 0.05);
+    ctx.quadraticCurveTo(
+      side * BW * 0.45, -BH * 0.3,
+      side * BW * 0.85, -BH * 0.1
+    );
+    ctx.quadraticCurveTo(
+      side * BW * 0.6, BH * 0.15,
+      side * BW * 0.3, BH * 0.18,
+    );
+    ctx.quadraticCurveTo(
+      side * BW * 0.15, BH * 0.12,
+      side * BW * 0.05, BH * 0.05
+    );
+    ctx.fillStyle = wingDark;
+    ctx.fill();
+
+    // Lower feather lobe (smallest)
+    ctx.beginPath();
+    ctx.moveTo(side * BW * 0.08, BH * 0.15);
+    ctx.quadraticCurveTo(
+      side * BW * 0.4, BH * 0.45,
+      side * BW * 0.7, BH * 0.3
+    );
+    ctx.quadraticCurveTo(
+      side * BW * 0.5, BH * 0.45,
+      side * BW * 0.25, BH * 0.42
+    );
+    ctx.quadraticCurveTo(
+      side * BW * 0.15, BH * 0.3,
+      side * BW * 0.08, BH * 0.15
+    );
+    ctx.fillStyle = wingColor;
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // ── Draw a flat-style bill (light blue-gray, like reference) ──
   function drawWingedBill(b) {
     ctx.save();
     ctx.globalAlpha = Math.max(0, b.opacity);
     ctx.translate(b.x, b.y);
     ctx.rotate(b.rot);
 
-    // Shadow
-    ctx.shadowColor = 'rgba(100,80,80,0.18)';
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetY = 5;
+    // Wings first (behind bill)
+    drawSoftWing(-1, b.wingAngle);
+    drawSoftWing(1, b.wingAngle);
 
-    // ── Wings (dove-style, soft gray/white) ──
-    [-1, 1].forEach(side => {
-      const flap = Math.sin(b.wingAngle) * 0.55;
-      ctx.save();
-      ctx.translate(side * BW * 0.46, -BH * 0.05);
-      ctx.rotate(side * (0.2 + flap));
+    // Soft shadow under bill
+    ctx.shadowColor = 'rgba(80,100,120,0.12)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 3;
 
-      // Upper wing shape
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.bezierCurveTo(
-        side * BW * 0.28, -BH * 1.05,
-        side * BW * 0.72, -BH * 0.85,
-        side * BW * 0.82, -BH * 0.05
-      );
-      ctx.bezierCurveTo(
-        side * BW * 0.55, BH * 0.15,
-        side * BW * 0.22, BH * 0.08,
-        0, 0
-      );
-      const wg = ctx.createLinearGradient(0, -BH, side * BW * 0.82, 0);
-      wg.addColorStop(0, '#f5f0ff');
-      wg.addColorStop(0.5, '#e8e0f8');
-      wg.addColorStop(1, '#d4c8ee');
-      ctx.fillStyle = wg;
-      ctx.fill();
-      ctx.shadowColor = 'transparent';
-      ctx.strokeStyle = '#c0aae0'; ctx.lineWidth = 1.8; ctx.stroke();
-
-      // Feather lines
-      for (let f = 0; f < 4; f++) {
-        const t = (f + 1) / 5;
-        ctx.beginPath();
-        ctx.moveTo(side * BW * 0.04 * t, -BH * 0.04);
-        ctx.quadraticCurveTo(
-          side * BW * (0.18 + 0.14 * f), -BH * (0.48 + 0.08 * f),
-          side * BW * (0.14 + 0.15 * f), -BH * 0.08
-        );
-        ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.lineWidth = 1.3; ctx.stroke();
-      }
-
-      // Lower feathers
-      ctx.beginPath();
-      ctx.moveTo(0, BH * 0.04);
-      ctx.bezierCurveTo(
-        side * BW * 0.22, BH * 0.38,
-        side * BW * 0.50, BH * 0.32,
-        side * BW * 0.65, BH * 0.08
-      );
-      ctx.bezierCurveTo(
-        side * BW * 0.40, BH * 0.28,
-        side * BW * 0.18, BH * 0.22,
-        0, BH * 0.04
-      );
-      ctx.fillStyle = '#ede5ff'; ctx.fill();
-      ctx.strokeStyle = '#bbaade'; ctx.lineWidth = 1.2; ctx.stroke();
-
-      ctx.restore();
-    });
-
-    // ── Bill body (light blue, like reference image) ──
     const hw = BW / 2, hh = BH / 2;
-    ctx.shadowColor = 'rgba(100,80,80,0.15)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
 
-    // Body gradient – soft sky blue
-    const bg = ctx.createLinearGradient(-hw, -hh, hw, hh);
-    bg.addColorStop(0, '#d6eeff');
-    bg.addColorStop(0.5, '#b8dcff');
-    bg.addColorStop(1, '#9ecff5');
+    // Bill body — flat pale blue-gray (#c8d8e0 like reference)
     ctx.beginPath();
-    ctx.roundRect(-hw, -hh, BW, BH, 10);
-    ctx.fillStyle = bg; ctx.fill();
+    ctx.roundRect(-hw, -hh, BW, BH, 3);
+    ctx.fillStyle = '#c8dde4';
+    ctx.fill();
     ctx.shadowColor = 'transparent';
 
-    // Outer border
-    ctx.strokeStyle = '#7ab8e8'; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.roundRect(-hw, -hh, BW, BH, 10); ctx.stroke();
+    // Thin darker outline
+    ctx.strokeStyle = '#7d9ba8';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(-hw, -hh, BW, BH, 3);
+    ctx.stroke();
 
-    // Inner frame
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.roundRect(-hw + 7, -hh + 6, BW - 14, BH - 12, 6); ctx.stroke();
+    // Inner thin frame
+    ctx.strokeStyle = 'rgba(125,155,168,0.5)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.roundRect(-hw + 3, -hh + 3, BW - 6, BH - 6, 2);
+    ctx.stroke();
 
-    // Center circle
-    ctx.beginPath(); ctx.arc(0, 0, BH * 0.31, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(100,170,230,0.2)'; ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.2; ctx.stroke();
+    // Center circle (white-ish)
+    ctx.beginPath();
+    ctx.arc(0, 0, BH * 0.34, 0, Math.PI * 2);
+    ctx.fillStyle = '#e8f0f4';
+    ctx.fill();
+    ctx.strokeStyle = '#7d9ba8';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
-    // Dollar sign
-    ctx.fillStyle = '#3a2a3a';
-    ctx.font = `bold ${BH * 0.45}px 'Fredoka One',cursive`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('$', 0, 0);
+    // $ sign in center (black, simple)
+    ctx.fillStyle = '#3a4a55';
+    ctx.font = `bold ${BH * 0.42}px 'Fredoka One', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('$', 0, BH * 0.02);
 
     ctx.restore();
   }
 
-  // ── Draw the cute coin purse ──
+  // ── Draw gama-guchi style coin purse (matches reference) ──
   function drawWallet(openAmt) {
     ctx.save();
     ctx.translate(WX, WY);
 
-    // Body of purse – peachy/beige
-    const wr = WW * 0.5;
-    const ht = WH * 0.7;
+    // ── Body: rounded pink-orange pouch ──
+    // Drop shadow
+    ctx.shadowColor = 'rgba(180,120,90,0.25)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 6;
 
-    // Main body rounded rectangle
-    ctx.shadowColor = 'rgba(80,60,40,0.25)';
-    ctx.shadowBlur = 18;
-    ctx.shadowOffsetY = 8;
+    // Main pouch body — flat rounded shape with soft gradient
+    const bodyGrad = ctx.createRadialGradient(-WW*0.15, -WH*0.1, WW*0.05, 0, 0, WW*0.7);
+    bodyGrad.addColorStop(0, '#f8d4c0');
+    bodyGrad.addColorStop(0.6, '#ecbca8');
+    bodyGrad.addColorStop(1, '#d49d88');
 
-    const purseGrad = ctx.createRadialGradient(-WW*0.1, -WH*0.2, 0, 0, 0, WW*0.7);
-    purseGrad.addColorStop(0, '#f5cba7');
-    purseGrad.addColorStop(0.6, '#e8a87c');
-    purseGrad.addColorStop(1, '#d4906a');
     ctx.beginPath();
-    ctx.ellipse(0, WH * 0.1, WW * 0.5, WH * 0.5, 0, 0, Math.PI * 2);
-    ctx.fillStyle = purseGrad; ctx.fill();
+    // Rounded purse body — wide oval with flat-ish top
+    ctx.moveTo(-WW * 0.48, -WH * 0.15);
+    ctx.bezierCurveTo(
+      -WW * 0.55, WH * 0.25,
+      -WW * 0.35, WH * 0.55,
+      0, WH * 0.55
+    );
+    ctx.bezierCurveTo(
+      WW * 0.35, WH * 0.55,
+      WW * 0.55, WH * 0.25,
+      WW * 0.48, -WH * 0.15
+    );
+    ctx.closePath();
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
     ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = '#3a2a3a'; ctx.lineWidth = 3; ctx.stroke();
 
-    // Highlight on body
+    // Soft highlight on body (left side gloss)
     ctx.beginPath();
-    ctx.ellipse(-WW*0.12, -WH*0.05, WW*0.22, WH*0.18, -0.4, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill();
+    ctx.ellipse(-WW * 0.22, WH * 0.05, WW * 0.13, WH * 0.22, -0.25, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fill();
 
-    // Purse top clasp area (opens upward with openAmt)
-    // Flap that rotates open
-    ctx.save();
-    ctx.translate(0, -WH * 0.35);
-    ctx.rotate(-openAmt * 0.9);  // opens backward
+    // Bottom subtle shadow on purse
+    ctx.beginPath();
+    ctx.ellipse(WW * 0.05, WH * 0.42, WW * 0.32, WH * 0.08, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(180,120,90,0.18)';
+    ctx.fill();
 
-    // Top flap
-    ctx.beginPath();
-    ctx.ellipse(0, 0, WW * 0.42, WH * 0.22, 0, Math.PI, Math.PI * 2);
-    ctx.fillStyle = '#d4906a'; ctx.fill();
-    ctx.strokeStyle = '#3a2a3a'; ctx.lineWidth = 2.5; ctx.stroke();
+    // ── Metal frame (kissing-clasp top) ──
+    // Frame is a thin curved bar across top of purse
+    const frameY = -WH * 0.18;
+    const frameW = WW * 0.85;
+    const frameH = WH * 0.1;
 
-    // Clasp ball left
+    // Frame fill (taupe/gray metal but soft)
     ctx.beginPath();
-    ctx.arc(-WW * 0.15, 0, WW * 0.065, 0, Math.PI * 2);
-    ctx.fillStyle = '#f0d080'; ctx.fill();
-    ctx.strokeStyle = '#3a2a3a'; ctx.lineWidth = 2.2; ctx.stroke();
-    // shine
-    ctx.beginPath();
-    ctx.arc(-WW * 0.175, -WW * 0.022, WW * 0.02, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fill();
+    ctx.roundRect(-frameW/2, frameY - frameH/2, frameW, frameH, frameH/2);
+    ctx.fillStyle = '#b89a85';
+    ctx.fill();
 
-    // Clasp ball right
+    // Frame top highlight line
     ctx.beginPath();
-    ctx.arc(WW * 0.15, 0, WW * 0.065, 0, Math.PI * 2);
-    ctx.fillStyle = '#f0d080'; ctx.fill();
-    ctx.strokeStyle = '#3a2a3a'; ctx.lineWidth = 2.2; ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(WW * 0.125, -WW * 0.022, WW * 0.02, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fill();
+    ctx.moveTo(-frameW/2 + 6, frameY - frameH/2 + 2);
+    ctx.lineTo(frameW/2 - 6, frameY - frameH/2 + 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-    ctx.restore();
+    // ── Two clasp balls (left & right) ──
+    const ballR = WW * 0.05;
+    // Left ball
+    ctx.beginPath();
+    ctx.arc(-frameW/2 + ballR*0.5, frameY - frameH/2 - ballR*0.3, ballR, 0, Math.PI * 2);
+    ctx.fillStyle = '#a88870';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-frameW/2 + ballR*0.3, frameY - frameH/2 - ballR*0.5, ballR*0.35, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fill();
+
+    // Right ball
+    ctx.beginPath();
+    ctx.arc(frameW/2 - ballR*0.5, frameY - frameH/2 - ballR*0.3, ballR, 0, Math.PI * 2);
+    ctx.fillStyle = '#a88870';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(frameW/2 - ballR*0.7, frameY - frameH/2 - ballR*0.5, ballR*0.35, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fill();
+
+    // ── Opening (dark interior gap that grows with openAmt) ──
+    if (openAmt > 0.05) {
+      const openH = frameH * 0.6 + openAmt * WH * 0.18;
+      ctx.beginPath();
+      ctx.ellipse(0, frameY - openH * 0.15, frameW * 0.42, openH * 0.55, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#5a4338';
+      ctx.fill();
+
+      // Inner shadow gradient for depth
+      const innerGrad = ctx.createRadialGradient(0, frameY - openH*0.2, 0, 0, frameY - openH*0.15, frameW*0.42);
+      innerGrad.addColorStop(0, 'rgba(40,25,20,0.6)');
+      innerGrad.addColorStop(1, 'rgba(90,67,56,0)');
+      ctx.fillStyle = innerGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, frameY - openH * 0.15, frameW * 0.42, openH * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.restore();
   }
@@ -1561,12 +1619,11 @@ function moneyFlyAnimation(){
     ctx.clearRect(0, 0, W, H);
     globalTimer++;
 
-    // Wallet opens from frame 0→30
+    // Wallet opens 0→25 frames
     if (globalTimer <= 30) {
-      walletOpen = Math.min(1, globalTimer / 25);
+      walletOpen = Math.min(1, globalTimer / 20);
     }
 
-    // Update bills
     let allDone = true;
     bills.forEach(b => {
       b.timer++;
@@ -1576,38 +1633,37 @@ function moneyFlyAnimation(){
       }
 
       if (b.phase === 'launch') {
-        b.opacity = Math.min(1, b.opacity + 0.1);
-        b.vy -= 0.12;
+        b.opacity = Math.min(1, b.opacity + 0.12);
+        b.vy -= 0.1;
         if (b.opacity >= 1) b.phase = 'fly';
       } else if (b.phase === 'fly') {
-        b.vy = Math.max(b.vy - 0.07, -6);
-        b.vx += Math.sin(b.timer * b.drift) * 0.06;
+        b.vy = Math.max(b.vy - 0.06, -5);
+        b.vx += Math.sin(b.timer * b.drift) * 0.05;
         b.rot += b.rotSpeed;
         if (b.y < -BH * 2) b.phase = 'fade';
       } else if (b.phase === 'fade') {
-        b.opacity -= 0.04;
+        b.opacity -= 0.05;
         if (b.opacity <= 0) b.phase = 'done';
       }
 
       if (b.phase !== 'done' && b.phase !== 'wait') {
         b.x += b.vx;
         b.y += b.vy;
-        b.wingAngle += 0.16;
+        b.wingAngle += 0.18;
         allDone = false;
       } else if (b.phase === 'wait') {
         allDone = false;
       }
     });
 
-    // Draw wallet
+    // Draw order: wallet body bottom → bills (which emerge from opening) → wallet doesn't need a top layer since opening is just dark
     drawWallet(walletOpen);
 
-    // Draw bills (behind wallet if launching, in front once flying)
     bills.forEach(b => {
-      if (b.phase !== 'done') drawWingedBill(b);
+      if (b.phase !== 'done' && b.phase !== 'wait') drawWingedBill(b);
     });
 
-    if (allDone || globalTimer > 300) {
+    if (allDone || globalTimer > 320) {
       overlay.classList.remove('show');
       overlay.innerHTML = '';
     } else {
