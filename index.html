@@ -1006,6 +1006,7 @@ function getAmt(){
 }
 function submitExp(){
   const amount=getAmt();
+  showToast('金額：'+amount);
   if(!amount||amount<=0){showToast('金額不能為 0 🥺');return;}
   const d=getData();
   if(!d.entries[curMonth])d.entries[curMonth]=[];
