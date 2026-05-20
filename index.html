@@ -752,18 +752,20 @@ FB_EV_REF.on('value', snap => {
 
 function toArr(v){ if(!v) return []; if(Array.isArray(v)) return v; return Object.values(v); }
 function getData(){
-  const d = _cache;
-  if(d.entries){
-    Object.keys(d.entries).forEach(mo=>{
-      d.entries[mo] = toArr(d.entries[mo]);
+  const raw = _cache || {};
+  const d = {
+    members: toArr(raw.members),
+    entries: {},
+    defaultAmt: raw.defaultAmt || 1500
+  };
+  if(raw.entries){
+    Object.keys(raw.entries).forEach(mo=>{
+      d.entries[mo] = toArr(raw.entries[mo]);
     });
   }
   return d;
 }
-function save(d){
-  _cache = d;
-  FB_REF.set(d);
-}
+function save(d){ _cache = d; FB_REF.set(d); }
 function getEvData(){ return Array.isArray(_evCache) ? _evCache : Object.values(_evCache||{}); }
 function saveEvData(d){
   _evCache = d;
