@@ -416,14 +416,8 @@
   #moneyOverlay.show { display: block; }
   .money-item {
     position: absolute;
-    font-size: 2.2rem;
-    animation: moneyFly 1.2s ease-in forwards;
     pointer-events: none;
-  }
-  @keyframes moneyFly {
-    0%   { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
-    60%  { transform: translateY(-55vh) rotate(var(--rot)) scale(1.2); opacity: 0.9; }
-    100% { transform: translateY(-110vh) rotate(var(--rot2)) scale(0.5); opacity: 0; }
+    will-change: transform, opacity;
   }
 
   .empty { text-align: center; padding: 32px 16px; color: var(--soft); }
@@ -1344,22 +1338,175 @@ function moneyFlyAnimation(){
   const overlay = document.getElementById('moneyOverlay');
   overlay.innerHTML = '';
   overlay.classList.add('show');
-  const emojis = ['💸','💸','💸','💰','😭','💸','🤑','💸'];
+
   const W = window.innerWidth;
   const H = window.innerHeight;
-  for(let i=0;i<18;i++){
-    const el = document.createElement('div');
-    el.className = 'money-item';
-    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
-    const x = Math.random()*W;
-    const y = H * 0.4 + Math.random()*(H*0.5);
-    const rot = (Math.random()-0.5)*120;
-    const rot2 = (Math.random()-0.5)*200;
-    const delay = Math.random()*0.4;
-    el.style.cssText = `left:${x}px;top:${y}px;--rot:${rot}deg;--rot2:${rot2}deg;animation-delay:${delay}s;font-size:${1.5+Math.random()*1.5}rem;`;
-    overlay.appendChild(el);
+
+  // Create canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
+  overlay.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  // Bill state
+  const bill = {
+    x: W/2, y: H*0.75,
+    w: Math.min(W*0.7, 280), h: 0,
+    vx: 0, vy: -3.5,
+    rot: 0, rotV: 0,
+    scale: 0.1, scaleV: 0.07,
+    wingAngle: 0, wingV: 0.12,
+    opacity: 1, phase: 'grow' // grow → fly → fade
+  };
+  bill.h = bill.w * 0.46;
+
+  function drawBill(b){
+    ctx.save();
+    ctx.globalAlpha = b.opacity;
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.rot);
+    ctx.scale(b.scale, b.scale);
+
+    const w = b.w, h = b.h;
+    const hw = w/2, hh = h/2;
+
+    // ── WINGS ──
+    const wa = Math.sin(b.wingAngle)*0.55;
+    // Left wing
+    ctx.save();
+    ctx.translate(-hw, 0);
+    ctx.rotate(-0.2 - wa);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(-w*0.55, -h*0.8, -w*0.9, -h*0.3, -w*0.75, h*0.15);
+    ctx.bezierCurveTo(-w*0.5, h*0.05, -w*0.2, -h*0.1, 0, 0);
+    ctx.fillStyle = '#c8e6c9';
+    ctx.fill();
+    ctx.strokeStyle = '#2e7d32';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // Wing veins
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(-w*0.55,-h*0.5);
+    ctx.moveTo(-w*0.1,-h*0.05); ctx.lineTo(-w*0.55,-h*0.15);
+    ctx.moveTo(-w*0.2,-h*0.1); ctx.lineTo(-w*0.6,-h*0.3);
+    ctx.strokeStyle='#388e3c'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.restore();
+
+    // Right wing
+    ctx.save();
+    ctx.translate(hw, 0);
+    ctx.rotate(0.2 + wa);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(w*0.55, -h*0.8, w*0.9, -h*0.3, w*0.75, h*0.15);
+    ctx.bezierCurveTo(w*0.5, h*0.05, w*0.2, -h*0.1, 0, 0);
+    ctx.fillStyle = '#c8e6c9';
+    ctx.fill();
+    ctx.strokeStyle = '#2e7d32';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(w*0.55,-h*0.5);
+    ctx.moveTo(w*0.1,-h*0.05); ctx.lineTo(w*0.55,-h*0.15);
+    ctx.moveTo(w*0.2,-h*0.1); ctx.lineTo(w*0.6,-h*0.3);
+    ctx.strokeStyle='#388e3c'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.restore();
+
+    // ── BILL BODY ──
+    // Shadow
+    ctx.shadowColor='rgba(0,0,0,0.25)'; ctx.shadowBlur=18; ctx.shadowOffsetY=6;
+    // Main body
+    const grad = ctx.createLinearGradient(-hw,-hh,-hw+w*0.3,hh);
+    grad.addColorStop(0,'#85bb65');
+    grad.addColorStop(0.4,'#6aaa4f');
+    grad.addColorStop(1,'#4a8a35');
+    ctx.beginPath();
+    ctx.roundRect(-hw,-hh,w,h,14);
+    ctx.fillStyle=grad; ctx.fill();
+    ctx.shadowColor='transparent';
+
+    // Border
+    ctx.beginPath();
+    ctx.roundRect(-hw,-hh,w,h,14);
+    ctx.strokeStyle='#2e7d32'; ctx.lineWidth=4; ctx.stroke();
+
+    // Inner border
+    ctx.beginPath();
+    ctx.roundRect(-hw+10,-hh+8,w-20,h-16,8);
+    ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=2; ctx.stroke();
+
+    // Center oval portrait
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w*0.16, h*0.38, 0, 0, Math.PI*2);
+    ctx.fillStyle='#4a8a35';
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=2; ctx.stroke();
+    // Smiley face in oval
+    ctx.fillStyle='#ffd700';
+    ctx.beginPath(); ctx.arc(0,-h*0.06,h*0.16,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#333';
+    ctx.beginPath(); ctx.arc(-h*0.05,-h*0.1,h*0.025,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(h*0.05,-h*0.1,h*0.025,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,-h*0.02,h*0.06,0,Math.PI); ctx.strokeStyle='#333'; ctx.lineWidth=2; ctx.stroke();
+
+    // Amount text
+    ctx.fillStyle='#ffd700';
+    ctx.font=`bold ${h*0.28}px 'Fredoka One',cursive`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('$$$', 0, -hh+h*0.22);
+
+    // Bottom text
+    ctx.fillStyle='rgba(255,255,255,0.7)';
+    ctx.font=`${h*0.13}px 'Noto Sans TC',sans-serif`;
+    ctx.fillText('公費管家', 0, hh-h*0.2);
+
+    // Corner decorations
+    [[-hw+22,-hh+18],[hw-22,-hh+18],[-hw+22,hh-18],[hw-22,hh-18]].forEach(([cx,cy])=>{
+      ctx.fillStyle='rgba(255,255,255,0.5)';
+      ctx.font=`bold ${h*0.2}px 'Fredoka One',cursive`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('$',cx,cy);
+    });
+
+    ctx.restore();
   }
-  setTimeout(()=>{ overlay.classList.remove('show'); overlay.innerHTML=''; }, 1800);
+
+  let frame = 0;
+  function animate(){
+    ctx.clearRect(0,0,W,H);
+
+    if(bill.phase==='grow'){
+      bill.scale += bill.scaleV;
+      bill.scaleV *= 0.82;
+      if(bill.scale >= 0.98){ bill.scale=1; bill.phase='fly'; }
+    } else if(bill.phase==='fly'){
+      bill.x += bill.vx;
+      bill.y += bill.vy;
+      bill.vy -= 0.12;
+      bill.vx += (Math.random()-0.5)*0.3;
+      bill.rot += 0.018;
+      if(bill.y < -H*0.2) bill.phase='fade';
+    } else {
+      bill.opacity -= 0.06;
+    }
+
+    bill.wingAngle += bill.wingV;
+    bill.wingV += (Math.random()-0.5)*0.02;
+    bill.wingV = Math.max(0.06, Math.min(0.22, bill.wingV));
+
+    drawBill(bill);
+
+    frame++;
+    if(bill.opacity > 0){
+      requestAnimationFrame(animate);
+    } else {
+      overlay.classList.remove('show');
+      overlay.innerHTML='';
+    }
+  }
+  requestAnimationFrame(animate);
 }
 
 function showToast(msg){
