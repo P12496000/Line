@@ -412,8 +412,6 @@
   .empty p { font-family: 'Fredoka One', cursive; font-size: 0.9rem; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
 </head>
 <body>
@@ -704,50 +702,17 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  STORAGE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  FIREBASE
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━
-const firebaseConfig = {
-  databaseURL: 'https://line-1fb38-default-rtdb.asia-southeast1.firebasedatabase.app'
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
 function getRoomId(){
   let h=location.hash.replace('#','');
   if(!h){h='fam_'+Math.random().toString(36).substr(2,8);location.hash=h;}
   return h;
 }
-const ROOM=getRoomId();
-const FB_REF = db.ref('rooms/' + ROOM);
-const FB_EV_REF = db.ref('ev/' + ROOM);
-
-// In-memory cache
-let _cache = {members:[],entries:{},defaultAmt:1500};
-let _evCache = [];
-let _fbReady = false;
-
-// Listen for real-time updates
-FB_REF.on('value', snap => {
-  _cache = snap.val() || {members:[],entries:{},defaultAmt:1500};
-  _fbReady = true;
-  refreshAll();
-});
-FB_EV_REF.on('value', snap => {
-  _evCache = snap.val() || [];
-  if(_fbReady) refreshAll();
-});
-
-function getData(){ return _cache; }
-function save(d){
-  _cache = d;
-  FB_REF.set(d);
+const ROOM=getRoomId(), KEY='famV5_'+ROOM;
+function getData(){
+  try{return JSON.parse(localStorage.getItem(KEY))||{members:[],entries:{},defaultAmt:1500};}
+  catch{return{members:[],entries:{},defaultAmt:1500};}
 }
-function getEvData(){ return Array.isArray(_evCache) ? _evCache : Object.values(_evCache||{}); }
-function saveEvData(d){
-  _evCache = d;
-  FB_EV_REF.set(d);
-}
+function save(d){localStorage.setItem(KEY,JSON.stringify(d));}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  AVATARS
@@ -1288,7 +1253,7 @@ function showToast(msg){
   t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
-window.addEventListener('storage',e=>{});
+window.addEventListener('storage',e=>{if(e.key===KEY)refreshAll();});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  CUSTOM CONFIRM (replaces native confirm())
@@ -1310,11 +1275,17 @@ function showConfirm(msg, emoji, onOk){
 }
 
 function refreshAll(){updateNavMo();refreshHome();if(curPage==='stats')refreshStats();if(curPage==='ev')refreshEv();if(curPage==='settings')refreshSettings();}
-// Firebase listener will call refreshAll() on first data load
+refreshAll();
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  EV ELECTRICITY
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
+const EV_KEY = 'evRecords_' + ROOM;
+function getEvData(){
+  try{ return JSON.parse(localStorage.getItem(EV_KEY))||[]; }
+  catch{ return []; }
+}
+function saveEvData(d){ localStorage.setItem(EV_KEY, JSON.stringify(d)); }
 
 function addEvRecord(){
   const y = document.getElementById('evYear').value;
