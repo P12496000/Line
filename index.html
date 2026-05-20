@@ -407,6 +407,25 @@
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  /* ── MONEY FLY ANIMATION ── */
+  #moneyOverlay {
+    position: fixed; inset: 0; z-index: 999;
+    pointer-events: none; overflow: hidden;
+    display: none;
+  }
+  #moneyOverlay.show { display: block; }
+  .money-item {
+    position: absolute;
+    font-size: 2.2rem;
+    animation: moneyFly 1.2s ease-in forwards;
+    pointer-events: none;
+  }
+  @keyframes moneyFly {
+    0%   { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+    60%  { transform: translateY(-55vh) rotate(var(--rot)) scale(1.2); opacity: 0.9; }
+    100% { transform: translateY(-110vh) rotate(var(--rot2)) scale(0.5); opacity: 0; }
+  }
+
   .empty { text-align: center; padding: 32px 16px; color: var(--soft); }
   .empty .ee { font-size: 3.2rem; margin-bottom: 8px; display: block; }
   .empty p { font-family: 'Fredoka One', cursive; font-size: 0.9rem; }
@@ -634,6 +653,8 @@
   </div>
 </div>
 
+<div id="moneyOverlay"></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -845,8 +866,12 @@ function confirmUnpay(){
     document.getElementById('payModal').classList.remove('show');
     payTarget=null;
     const d=getData();
+    const entry=d.entries[curMonth]&&d.entries[curMonth].find(e=>e.id===entryId);
+    const amt=entry?entry.amount:0;
     d.entries[curMonth]=d.entries[curMonth].filter(e=>e.id!==entryId);
     save(d);
+    const bal=calcBalance(getData(),curMonth);
+    sendLineNotify(buildLineMsg('expense','🗑️','取消繳費：'+memberName,amt,bal));
     showToast('🗑️ 已取消 '+memberName+' 的繳費');
     refreshAll();
   });
@@ -1006,7 +1031,6 @@ function getAmt(){
 }
 function submitExp(){
   const amount=getAmt();
-  showToast('金額：'+amount);
   if(!amount||amount<=0){showToast('金額不能為 0 🥺');return;}
   const d=getData();
   if(!d.entries[curMonth])d.entries[curMonth]=[];
@@ -1017,6 +1041,8 @@ function submitExp(){
   if(addMode==='expense'){
     d.entries[curMonth].push({id:Date.now(),type:'expense',cat:selCat.name,icon:selCat.icon,amount,note,date:ds,member:'管理員'});
     lineIcon=selCat.icon; lineName=selCat.name+(note?'：'+note:''); lineType='expense';
+    closeAdd();
+    moneyFlyAnimation();
   } else {
     const n=document.getElementById('otherIncNote').value.trim()||'其他收入';
     d.entries[curMonth].push({id:Date.now(),type:'income',icon:'💰',amount,note:n,date:ds,member:'其他',fixedPay:false});
@@ -1029,13 +1055,21 @@ function submitExp(){
   document.getElementById('amNum').textContent='0';
   document.getElementById('amNote').value='';
   document.getElementById('otherIncNote').value='';
-  closeAdd();showToast('✅ 記帳成功！');refreshAll();
+  if(addMode!=='expense') closeAdd();
+  showToast('✅ 記帳成功！');refreshAll();
 }
 function delEntry(id){
   showConfirm('刪除這筆記錄？','🗑️',()=>{
     const d=getData();
+    const entry=d.entries[curMonth]&&d.entries[curMonth].find(e=>e.id===id);
     if(d.entries[curMonth])d.entries[curMonth]=d.entries[curMonth].filter(e=>e.id!==id);
-    save(d);refreshAll();
+    save(d);
+    if(entry){
+      const bal=calcBalance(getData(),curMonth);
+      const name=entry.type==='expense'?(entry.cat+(entry.note?'：'+entry.note:'')):(entry.note||'其他收入');
+      sendLineNotify(buildLineMsg(entry.type,'🗑️','已刪除：'+name,entry.amount,bal));
+    }
+    refreshAll();
   });
 }
 
@@ -1307,6 +1341,28 @@ function clearData(){
     const d=getData();d.entries[curMonth]=[];save(d);refreshAll();showToast('🗑️ 已清除');
   });
 }
+function moneyFlyAnimation(){
+  const overlay = document.getElementById('moneyOverlay');
+  overlay.innerHTML = '';
+  overlay.classList.add('show');
+  const emojis = ['💸','💸','💸','💰','😭','💸','🤑','💸'];
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  for(let i=0;i<18;i++){
+    const el = document.createElement('div');
+    el.className = 'money-item';
+    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    const x = Math.random()*W;
+    const y = H * 0.4 + Math.random()*(H*0.5);
+    const rot = (Math.random()-0.5)*120;
+    const rot2 = (Math.random()-0.5)*200;
+    const delay = Math.random()*0.4;
+    el.style.cssText = `left:${x}px;top:${y}px;--rot:${rot}deg;--rot2:${rot2}deg;animation-delay:${delay}s;font-size:${1.5+Math.random()*1.5}rem;`;
+    overlay.appendChild(el);
+  }
+  setTimeout(()=>{ overlay.classList.remove('show'); overlay.innerHTML=''; }, 1800);
+}
+
 function showToast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
