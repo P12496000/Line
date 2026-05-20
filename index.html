@@ -1408,10 +1408,11 @@ function moneyFlyAnimation(){
   // ── Tear drop particles ──
   // In the image, tears fall from cheeks around these approx image-relative positions:
   // Left cheek: ~38% x, ~48% y  | Right cheek: ~60% x, ~46% y
+  // Exact tear positions from image pixel analysis
+  // Right eye tear: x=0.654, y=0.374 | Left eye tear: x=0.506, y=0.400
   const tearSources = [
-    { rx: 0.36, ry: 0.46 },
-    { rx: 0.62, ry: 0.44 },
-    { rx: 0.40, ry: 0.50 },
+    { rx: 0.654, ry: 0.374 },   // right eye (image right)
+    { rx: 0.506, ry: 0.400 },   // left eye (image left / nose side)
   ];
 
   let tears = [];
@@ -1419,15 +1420,15 @@ function moneyFlyAnimation(){
     const startX = IMG_X + source.rx * IMG_SIZE;
     const startY = IMG_Y + source.ry * IMG_SIZE;
     tears.push({
-      x: startX + (Math.random() - 0.5) * 8,
+      x: startX + (Math.random() - 0.5) * 5,
       y: startY,
-      vy: 1.2 + Math.random() * 1.4,
-      vx: (Math.random() - 0.5) * 0.4,
-      size: 3.5 + Math.random() * 2.5,
+      vy: 1.4 + Math.random() * 1.2,
+      vx: (Math.random() - 0.5) * 0.3,
+      size: 3.0 + Math.random() * 2.0,
       opacity: 0,
-      phase: 'fall',  // fall → splat → fade
-      splat: false,
+      phase: 'fall',
       splatR: 0,
+      splatAng: 0,
       trail: [],
     });
   }
@@ -1568,12 +1569,11 @@ function moneyFlyAnimation(){
     globalTimer++;
     tearTimer++;
 
-    // Spawn tears periodically
-    if (tearTimer % 14 === 0 && globalTimer < 220) {
-      const src = tearSources[Math.floor(Math.random()*tearSources.length)];
-      spawnTear(src);
-      // Sometimes spawn 2 at once
-      if (Math.random() < 0.35) spawnTear(tearSources[Math.floor(Math.random()*tearSources.length)]);
+    // Spawn tears from each eye alternately
+    if (globalTimer < 240) {
+      if (globalTimer % 16 === 0) spawnTear(tearSources[0]); // right eye stream
+      if (globalTimer % 20 === 8) spawnTear(tearSources[1]); // left eye stream, offset
+      if (globalTimer % 32 === 0 && Math.random() < 0.5) spawnTear(tearSources[0]); // extra burst
     }
 
     // Shake (small, quick)
@@ -1591,8 +1591,8 @@ function moneyFlyAnimation(){
       if (t.phase === 'fall') {
         t.opacity = Math.min(0.92, t.opacity + 0.18);
         t.y += t.vy; t.x += t.vx; t.vy += 0.09;
-        // Check if tear has fallen far enough (off the chin area)
-        if (t.y > IMG_Y + IMG_SIZE * 0.72) {
+        // Check if tear has fallen far enough (chin/neck area ~65% of image height)
+        if (t.y > IMG_Y + IMG_SIZE * 0.66) {
           t.phase = 'splat';
           t.splatR = 0;
           t.splatAng = Math.random()*Math.PI*2;
