@@ -731,18 +731,35 @@ let _fbReady = false;
 FB_REF.on('value', snap => {
   _cache = snap.val() || {members:[],entries:{},defaultAmt:1500};
   _fbReady = true;
-  refreshAll();
+  if(document.readyState === 'complete' || document.readyState === 'interactive'){
+    refreshAll();
+  } else {
+    document.addEventListener('DOMContentLoaded', refreshAll);
+  }
 }, err => {
   showToast('Firebase錯誤：' + err.code);
 });
 FB_EV_REF.on('value', snap => {
   _evCache = snap.val() || [];
-  if(_fbReady) refreshAll();
+  if(_fbReady){
+    if(document.readyState === 'complete' || document.readyState === 'interactive'){
+      refreshAll();
+    }
+  }
 }, err => {
   showToast('EV錯誤：' + err.code);
 });
 
-function getData(){ return _cache; }
+function toArr(v){ if(!v) return []; if(Array.isArray(v)) return v; return Object.values(v); }
+function getData(){
+  const d = _cache;
+  if(d.entries){
+    Object.keys(d.entries).forEach(mo=>{
+      d.entries[mo] = toArr(d.entries[mo]);
+    });
+  }
+  return d;
+}
 function save(d){
   _cache = d;
   FB_REF.set(d);
