@@ -409,7 +409,7 @@
 
   /* ── MONEY FLY ANIMATION ── */
   #moneyOverlay {
-    position: fixed; inset: 0; z-index: 999;
+    position: fixed; inset: 0; z-index: 9999;
     pointer-events: none; overflow: hidden;
     display: none;
   }
@@ -1041,8 +1041,6 @@ function submitExp(){
   if(addMode==='expense'){
     d.entries[curMonth].push({id:Date.now(),type:'expense',cat:selCat.name,icon:selCat.icon,amount,note,date:ds,member:'管理員'});
     lineIcon=selCat.icon; lineName=selCat.name+(note?'：'+note:''); lineType='expense';
-    closeAdd();
-    moneyFlyAnimation();
   } else {
     const n=document.getElementById('otherIncNote').value.trim()||'其他收入';
     d.entries[curMonth].push({id:Date.now(),type:'income',icon:'💰',amount,note:n,date:ds,member:'其他',fixedPay:false});
@@ -1055,7 +1053,8 @@ function submitExp(){
   document.getElementById('amNum').textContent='0';
   document.getElementById('amNote').value='';
   document.getElementById('otherIncNote').value='';
-  if(addMode!=='expense') closeAdd();
+  closeAdd();
+  if(lineType==='expense') setTimeout(moneyFlyAnimation, 100);
   showToast('✅ 記帳成功！');refreshAll();
 }
 function delEntry(id){
