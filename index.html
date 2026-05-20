@@ -1348,16 +1348,16 @@ function moneyFlyAnimation(){
   overlay.appendChild(canvas);
   const ctx = canvas.getContext('2d');
 
-  const bw = Math.min(W*0.65, 260);
+  const bw = Math.min(W*0.45, 180);
   const bh = bw * 0.46;
 
   const bill = {
-    x: W/2, y: H*0.6,
-    vx: 0.5, vy: 0,
+    x: W/2, y: H*0.65,
+    vx: 0.3, vy: 0,
     rot: 0,
     wingAngle: 0,
     opacity: 1,
-    phase: 'rise', // rise → fly → fade
+    phase: 'rise',
     timer: 0
   };
 
@@ -1483,15 +1483,15 @@ function moneyFlyAnimation(){
     bill.wingAngle += 0.18;
 
     if(bill.phase==='rise'){
-      bill.vy -= 0.35;
-      if(bill.timer > 18) bill.phase='fly';
+      bill.vy -= 0.15;
+      if(bill.timer > 25) bill.phase='fly';
     } else if(bill.phase==='fly'){
-      bill.vy -= 0.18;
-      bill.vx += Math.sin(bill.timer*0.05)*0.15;
-      bill.rot += 0.012;
+      bill.vy -= 0.08;
+      bill.vx += Math.sin(bill.timer*0.04)*0.08;
+      bill.rot += 0.006;
       if(bill.y < -bh) bill.phase='fade';
     } else {
-      bill.opacity -= 0.05;
+      bill.opacity -= 0.03;
     }
 
     bill.x += bill.vx;
