@@ -603,11 +603,6 @@
       <input class="field-input" id="newMem" placeholder="輸入成員名字..." maxlength="12">
       <button class="add-member-btn" onclick="addMember()">＋ 新增</button>
     </div>
-    <div class="field-label">預設月繳金額</div>
-    <div class="row-input" style="margin-bottom:14px;">
-      <input class="field-input" id="defaultAmt" type="number" placeholder="1500" style="margin-bottom:0;">
-      <button class="add-member-btn" onclick="saveDefaultAmt()">💾 儲存</button>
-    </div>
     <div class="list-card" id="memList" style="margin:0;"></div>
   </div>
 </div>
@@ -872,7 +867,7 @@ function openPayModal(memberName){
   document.getElementById('payTitle').textContent=memberName;
   const mo=curMonth.split('-');
   document.getElementById('paySub').textContent=`${parseInt(mo[1])}月公費繳費 🌸`;
-  document.getElementById('payAmtInput').value=existing?existing.amount:(d.defaultAmt||1500);
+  document.getElementById('payAmtInput').value=existing?existing.amount:(m.defaultAmt||d.defaultAmt||1500);
   const ub=document.getElementById('unpayBtn');
   const cb=document.getElementById('payConfirmBtn');
   if(existing){ub.style.display='block';cb.textContent='✏️ 修改金額';}
@@ -1007,7 +1002,7 @@ function addMember(){
   if(!n)return;
   const d=getData();
   if(d.members.find(m=>m.name===n)){showToast('成員已存在 👥');return;}
-  d.members.push({name:n,avatar:pickAv()});
+  d.members.push({name:n,avatar:pickAv(),defaultAmt:1500});
   save(d);document.getElementById('newMem').value='';
   refreshSettings();refreshAll();showToast(`✅ 新增成員 ${n}！`);
 }
@@ -1026,10 +1021,15 @@ function changeAvatar(name){
   const cur=AVATARS.indexOf(m.avatar);m.avatar=AVATARS[(cur+1)%AVATARS.length];
   save(d);refreshSettings();refreshAll();
 }
-function saveDefaultAmt(){
-  const v=parseFloat(document.getElementById('defaultAmt').value);
-  if(!v||v<=0){showToast('請輸入正確金額');return;}
-  const d=getData();d.defaultAmt=v;save(d);showToast('✅ 預設金額已儲存！');
+function saveMemAmt(name, inputEl){
+  const v=parseFloat(inputEl.value);
+  if(!v||v<=0){showToast('請輸入正確金額 🥺');return;}
+  const d=getData();
+  const m=d.members.find(x=>x.name===name);
+  if(!m)return;
+  m.defaultAmt=v;
+  save(d);
+  showToast('✅ '+name+' 月繳金額已更新！');
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1321,15 +1321,24 @@ function refreshSettings(){
   initAnimDur();
   const d=getData();
   document.getElementById('shareBox').textContent=location.href.split('#')[0]+'#'+ROOM;
-  document.getElementById('defaultAmt').value=d.defaultAmt||1500;
   document.getElementById('memList').innerHTML=!d.members.length
     ?'<div class="empty" style="padding:16px;"><p>還沒有成員，請新增</p></div>'
-    :d.members.map(m=>{
+    :d.members.map((m,i)=>{
       const esc=m.name.replace(/'/g,"\\'");
-      return `<div class="list-item">
-        <div class="item-icon plain" style="cursor:pointer;" onclick="changeAvatar('${esc}')">${m.avatar}</div>
-        <div class="item-info"><div class="item-name">${m.name}</div><div class="item-date">點頭像換圖示 🎨</div></div>
-        <button class="mem-del-btn" onclick="remMem('${esc}')">🗑️ 刪除</button>
+      const amt=m.defaultAmt||1500;
+      return `<div class="list-item" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px 15px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="item-icon plain" style="cursor:pointer;" onclick="changeAvatar('${esc}')">${m.avatar}</div>
+          <div class="item-info"><div class="item-name">${m.name}</div><div class="item-date">點頭像換圖示 🎨</div></div>
+          <button class="mem-del-btn" onclick="remMem('${esc}')">🗑️ 刪除</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 4px;">
+          <span style="font-family:'Fredoka One';font-size:0.82rem;color:var(--soft);white-space:nowrap;">月繳金額 $</span>
+          <input class="field-input" type="number" value="${amt}"
+            style="margin-bottom:0;flex:1;padding:9px 12px;font-size:0.95rem;"
+            onchange="saveMemAmt('${esc}', this)"
+            onblur="saveMemAmt('${esc}', this)">
+        </div>
       </div>`;
     }).join('');
 }
