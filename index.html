@@ -618,6 +618,9 @@
 <!-- ══ PAY MODAL ══ -->
 <div class="modal-overlay center" id="payModal">
   <div class="modal-sheet center-sheet">
+    <div id="payWrongMonthBanner" style="display:none;background:#fff3cd;border:1.5px solid #f5a623;border-radius:10px;margin:0 0 10px;padding:8px 12px;font-size:0.82rem;color:#7a5000;line-height:1.4;width:100%;box-sizing:border-box;">
+      ⚠️ 將存入 <strong id="payWrongMonthLabel"></strong>，非本月
+    </div>
     <span class="pay-emoji" id="payEmoji">👤</span>
     <div class="pay-title" id="payTitle">確認繳費</div>
     <div class="pay-sub" id="paySub">本月公費</div>
@@ -873,6 +876,12 @@ function openPayModal(memberName){
   const cb=document.getElementById('payConfirmBtn');
   if(existing){ub.style.display='block';cb.textContent='✏️ 修改金額';}
   else{ub.style.display='none';cb.textContent='✅ 確認繳費';}
+  // 防呆 banner
+  const nowMonthPM = new Date().toISOString().substr(0,7);
+  const pmBanner = document.getElementById('payWrongMonthBanner');
+  const pmLbl = document.getElementById('payWrongMonthLabel');
+  if(pmBanner){ pmBanner.style.display = curMonth !== nowMonthPM ? 'block' : 'none'; }
+  if(pmLbl && curMonth !== nowMonthPM){ pmLbl.textContent = moLabel(curMonth); }
   document.getElementById('payModal').classList.add('show');
 }
 function closePayModal(){document.getElementById('payModal').classList.remove('show');payTarget=null;}
@@ -890,7 +899,9 @@ function confirmPay(){
   if(entryId)
     d.entries[curMonth]=d.entries[curMonth].filter(e=>e.id!==entryId);
   const now=new Date();
-  const dateStr=String(now.getMonth()+1).padStart(2,'0')+'/'+String(now.getDate()).padStart(2,'0');
+  const nowMonthPay = now.toISOString().substr(0,7);
+  const dateStr = String(now.getMonth()+1).padStart(2,'0')+'/'+String(now.getDate()).padStart(2,'0')
+    + (nowMonthPay !== curMonth ? '＊' : '');
   d.entries[curMonth].push({
     id:Date.now(),type:'income',
     icon:avatar,amount:amt,
@@ -1089,7 +1100,14 @@ function submitExp(){
   if(!d.entries[curMonth])d.entries[curMonth]=[];
   const note=document.getElementById('amNote').value.trim();
   const now=new Date();
-  const ds=`${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
+  const nowMonth2 = now.toISOString().substr(0,7);
+  let ds;
+  if(curMonth === nowMonth2){
+    ds = `${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
+  } else {
+    // 補登其他月份：標記為補登日期（用今天日期加 * 提示）
+    ds = `${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}＊`;
+  }
   let lineIcon,lineName,lineType;
   if(addMode==='expense'){
     d.entries[curMonth].push({id:Date.now(),type:'expense',cat:selCat.name,icon:selCat.icon,amount,note,date:ds,member:'管理員'});
@@ -1402,6 +1420,16 @@ function openAdd(){
   document.getElementById('amNote').value='';
   document.getElementById('otherIncNote').value='';
   setMode('expense');renderCatGrid();
+  // 防呆：非當月時顯示警告
+  const nowMonth = new Date().toISOString().substr(0,7);
+  const banner = document.getElementById('wrongMonthBanner');
+  const bannerLbl = document.getElementById('wrongMonthLabel');
+  if(curMonth !== nowMonth){
+    bannerLbl.textContent = moLabel(curMonth);
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
   document.getElementById('addModal').classList.add('show');
 }
 function closeAdd(){document.getElementById('addModal').classList.remove('show');}
