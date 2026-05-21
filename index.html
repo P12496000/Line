@@ -643,6 +643,9 @@
 <div class="modal-overlay" id="addModal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
+    <div id="wrongMonthBanner" style="display:none;background:#fff3cd;border:1.5px solid #f5a623;border-radius:10px;margin:0 0 14px;padding:8px 12px;font-size:0.82rem;color:#7a5000;line-height:1.4;width:100%;box-sizing:border-box;">
+      ⚠️ 將記入 <strong id="wrongMonthLabel"></strong>，非本月
+    </div>
     <div class="modal-toggle">
       <button class="toggle-btn active-exp" id="tExp" onclick="setMode('expense')">💸 支出</button>
       <button class="toggle-btn" id="tInc" onclick="setMode('income')">💰 其他收入</button>
