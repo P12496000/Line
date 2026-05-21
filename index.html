@@ -1583,29 +1583,22 @@ function moneyFlyAnimation(){
     ctx.fillStyle = 'rgba(20,10,5,0.55)';
     ctx.fillRect(0,0,W,H);
 
-    // Draw tears (behind kid)
+    // Update tear physics (drawn AFTER kid so they appear on top)
     tears.forEach(t => {
       t.trail.push({x:t.x, y:t.y});
       if (t.trail.length > 6) t.trail.shift();
-
       if (t.phase === 'fall') {
         t.opacity = Math.min(0.92, t.opacity + 0.18);
         t.y += t.vy; t.x += t.vx; t.vy += 0.09;
-        // Check if tear has fallen far enough (chin/neck area ~65% of image height)
         if (t.y > IMG_Y + IMG_SIZE * 0.66) {
-          t.phase = 'splat';
-          t.splatR = 0;
-          t.splatAng = Math.random()*Math.PI*2;
+          t.phase = 'splat'; t.splatR = 0; t.splatAng = Math.random()*Math.PI*2;
         }
       } else if (t.phase === 'splat') {
-        t.splatR += 1.8;
-        t.opacity -= 0.06;
+        t.splatR += 1.8; t.opacity -= 0.06;
         if (t.opacity <= 0) t.phase = 'done';
       }
-      drawTear(t);
     });
     tears = tears.filter(t => t.phase !== 'done');
-
     // Draw kid (no background PNG, with slight shake)
     if (kidImg.complete && kidImg.naturalWidth > 0) {
       ctx.drawImage(kidImg, IMG_X + shakeX, IMG_Y, IMG_SIZE, IMG_SIZE);
@@ -1614,6 +1607,9 @@ function moneyFlyAnimation(){
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText('\uD83D\uDE2D', W/2, IMG_Y+IMG_SIZE/2);
     }
+
+    // Draw tears ON TOP of kid
+    tears.forEach(t => drawTear(t));
 
     // Floating hearts (like original illustration)
     if (globalTimer < 100) {
