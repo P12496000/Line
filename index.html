@@ -113,16 +113,12 @@
   .donut-amount {
     font-family: 'Fredoka One', cursive;
     font-size: 2.8rem; line-height: 1;
-    background: linear-gradient(135deg, var(--pink) 0%, #C060A0 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--pink);
     transition: transform 0.3s;
     min-width: 160px; text-align: center;
   }
   .donut-amount.negative {
-    background: linear-gradient(135deg, var(--exp) 0%, #C03020 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--exp);
   }
   .donut-amount.pop-anim {
     animation: balPop 0.5s cubic-bezier(0.34,1.56,0.64,1);
@@ -465,7 +461,14 @@
     will-change: transform, opacity;
   }
 
-  .empty { text-align: center; padding: 32px 16px; color: var(--soft); }
+  @keyframes bannerShake {
+    0%,100%{transform:translateX(0);}
+    20%{transform:translateX(-5px);}
+    40%{transform:translateX(5px);}
+    60%{transform:translateX(-3px);}
+    80%{transform:translateX(3px);}
+  }
+
   .empty .ee { font-size: 3.2rem; margin-bottom: 8px; display: block; }
   .empty p { font-family: 'Fredoka One', cursive; font-size: 0.9rem; }
 
@@ -693,6 +696,47 @@
 <div class="modal-overlay" id="addModal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
+
+    <!-- 非當月防呆 Banner -->
+    <div id="wrongMonthBanner" style="display:none;
+      background:linear-gradient(135deg,#fff3cd,#ffe4a0);
+      border:2px solid #f5a623; border-radius:14px;
+      margin-bottom:14px; padding:11px 14px;
+      box-shadow:2px 2px 0 #c87800;
+      animation: bannerShake 0.4s ease;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:1.5rem;">⚠️</span>
+        <div style="flex:1;">
+          <div style="font-family:'Fredoka One';font-size:0.95rem;color:#7a4000;">目前瀏覽的是過去月份！</div>
+          <div style="font-size:0.78rem;color:#9a5500;margin-top:2px;">
+            記帳將存入 <strong id="wrongMonthLabel" style="color:#c05000;"></strong>，不是本月
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="switchToNowAndAdd()" style="
+          flex:1;padding:9px;border-radius:50px;border:2px solid #c87800;
+          background:#fff;color:#7a4000;font-family:'Fredoka One';font-size:0.85rem;
+          cursor:pointer;box-shadow:2px 2px 0 #c87800;">
+          📅 切換到本月記帳
+        </button>
+        <button onclick="document.getElementById('wrongMonthBanner').style.display='none';document.getElementById('wrongMonthConfirmed').style.display='block';" style="
+          flex:1;padding:9px;border-radius:50px;border:2px solid #f5a623;
+          background:#f5a623;color:white;font-family:'Fredoka One';font-size:0.85rem;
+          cursor:pointer;box-shadow:2px 2px 0 #c87800;">
+          ✏️ 仍要補登
+        </button>
+      </div>
+    </div>
+
+    <!-- 補登確認小提示 -->
+    <div id="wrongMonthConfirmed" style="display:none;
+      background:#fff8e1;border:1.5px solid #f5a623;border-radius:10px;
+      padding:7px 12px;margin-bottom:12px;
+      font-size:0.78rem;color:#7a4000;gap:6px;">
+      ✏️ 補登模式：存入 <strong id="wrongMonthConfirmedLabel"></strong>
+    </div>
+
     <div class="modal-toggle">
       <button class="toggle-btn active-exp" id="tExp" onclick="setMode('expense')">💸 支出</button>
       <button class="toggle-btn" id="tInc" onclick="setMode('income')">💰 其他收入</button>
@@ -1515,17 +1559,29 @@ function openAdd(){
   document.getElementById('amNote').value='';
   document.getElementById('otherIncNote').value='';
   setMode('expense');renderCatGrid();
-  // 防呆：非當月時顯示警告
   const nowMonth = new Date().toISOString().substr(0,7);
   const banner = document.getElementById('wrongMonthBanner');
+  const confirmed = document.getElementById('wrongMonthConfirmed');
   const bannerLbl = document.getElementById('wrongMonthLabel');
+  const confirmedLbl = document.getElementById('wrongMonthConfirmedLabel');
   if(curMonth !== nowMonth){
-    bannerLbl.textContent = moLabel(curMonth);
-    banner.style.display = 'block';
+    const lbl = moLabel(curMonth);
+    if(bannerLbl) bannerLbl.textContent = lbl;
+    if(confirmedLbl) confirmedLbl.textContent = lbl;
+    if(banner){ banner.style.display='block'; banner.style.animation='none'; void banner.offsetWidth; banner.style.animation='bannerShake 0.4s ease'; }
+    if(confirmed) confirmed.style.display='none';
   } else {
-    banner.style.display = 'none';
+    if(banner) banner.style.display='none';
+    if(confirmed) confirmed.style.display='none';
   }
   document.getElementById('addModal').classList.add('show');
+}
+function switchToNowAndAdd(){
+  curMonth = new Date().toISOString().substr(0,7);
+  updateNavMo();
+  refreshAll();
+  closeAdd();
+  setTimeout(openAdd, 120);
 }
 function closeAdd(){document.getElementById('addModal').classList.remove('show');}
 document.getElementById('addModal').addEventListener('click',e=>{if(e.target.id==='addModal')closeAdd();});
@@ -1850,7 +1906,14 @@ function showConfirm(msg, emoji, onOk){
   newCancel.addEventListener('click',()=>{modal.classList.remove('show');});
 }
 
-function refreshAll(){updateNavMo();refreshHome();if(curPage==='stats')refreshStats();if(curPage==='ev')refreshEv();if(curPage==='settings')refreshSettings();}
+function refreshAll(){
+  try{
+    updateNavMo();refreshHome();
+    if(curPage==='stats')refreshStats();
+    if(curPage==='ev')refreshEv();
+    if(curPage==='settings')refreshSettings();
+  }catch(e){console.warn('refreshAll error',e);}
+}
 // Firebase listener will call refreshAll() on first data load
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
