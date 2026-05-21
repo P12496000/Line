@@ -866,8 +866,9 @@ function openPayModal(memberName){
   document.getElementById('payEmoji').textContent=m.avatar;
   document.getElementById('payTitle').textContent=memberName;
   const mo=curMonth.split('-');
-  document.getElementById('paySub').textContent=`${parseInt(mo[1])}月公費繳費 🌸`;
-  document.getElementById('payAmtInput').value=existing?existing.amount:(m.defaultAmt||d.defaultAmt||1500);
+  const memberDefaultAmt = m.defaultAmt || d.defaultAmt || 1500;
+  document.getElementById('paySub').textContent=`${parseInt(mo[1])}月公費繳費 🌸（應繳 $${memberDefaultAmt.toLocaleString()}）`;
+  document.getElementById('payAmtInput').value=existing?existing.amount:memberDefaultAmt;
   const ub=document.getElementById('unpayBtn');
   const cb=document.getElementById('payConfirmBtn');
   if(existing){ub.style.display='block';cb.textContent='✏️ 修改金額';}
@@ -1197,16 +1198,27 @@ function refreshHome(){
   const memberRows=d.members.map(m=>{
     const paid=incs.find(e=>e.member===m.name&&e.fixedPay);
     const esc=m.name.replace(/'/g,"\'");
+    const defaultAmt=m.defaultAmt||d.defaultAmt||1500;
+    const amtBadge=paid
+      ?`<div class="badge-paid">+${paid.amount.toLocaleString()}</div>`
+      :`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+          <div class="badge-unpaid">未繳</div>
+          <div style="font-size:0.72rem;color:var(--soft);">應繳 $${defaultAmt.toLocaleString()}</div>
+        </div>`;
+    const paidDate = paid ? paid.date : '';
+    const paidLabel = paid
+      ? '已繳 ' + (paidDate ? paidDate + ' · ' : '') + mLbl
+      : '未繳 ('+mLbl+')';
     return `<div class="member-row ${paid?'':'unpaid-row'}" onclick="openPayModal('${esc}')">
       <div class="item-icon plain">${m.avatar}</div>
-      <div class="item-info" style="${paid?'':'opacity:0.5;'}">
+      <div class="item-info">
         <div class="item-name">${m.name}</div>
-        <div class="item-date">${paid?'已繳 ('+mLbl+')':'未繳 ('+mLbl+')'}</div>
+        <div class="item-date">${paidLabel}</div>
       </div>
-      ${paid?'<div class=\"badge-paid\">+'+paid.amount.toLocaleString()+'</div>':'<div class=\"badge-unpaid\">未繳</div>'}
+      ${amtBadge}
     </div>`;
   });
-  const evRows=evRecs.map(r=>{
+    const evRows=evRecs.map(r=>{
     const paid=isEvPaid(r);
     return `<div class="member-row ${paid?'':'unpaid-row'}" onclick="openEvPayModal(${r.id})">
       <div class="item-icon plain">⚡</div>
