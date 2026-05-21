@@ -594,11 +594,21 @@
       </div>
       <div class="field-label">本次抄表度數</div>
       <div class="row-input">
-        <input class="field-input" id="evCurMeter" type="number" placeholder="目前電表度數" style="margin-bottom:0;">
+        <div class="field-input ev-numpad-display" id="evCurMeterDisp" onclick="openEvNumpad('meter')"
+          style="margin-bottom:0;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text);">
+          <span style="color:var(--soft);font-size:1rem;">⚡</span>
+          <span id="evCurMeterVal" style="font-family:'Fredoka One';font-size:1.3rem;flex:1;">0</span>
+          <span style="font-size:0.75rem;color:var(--soft);">度</span>
+        </div>
       </div>
       <div class="field-label">單價（元/度）</div>
       <div class="row-input" style="margin-bottom:0;">
-        <input class="field-input" id="evPrice" type="number" placeholder="例：2.66" step="0.01" style="margin-bottom:0;">
+        <div class="field-input ev-numpad-display" id="evPriceDisp" onclick="openEvNumpad('price')"
+          style="margin-bottom:0;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text);">
+          <span style="color:var(--soft);font-size:1rem;">💲</span>
+          <span id="evPriceVal" style="font-family:'Fredoka One';font-size:1.3rem;flex:1;">0</span>
+          <span style="font-size:0.75rem;color:var(--soft);">元/度</span>
+        </div>
         <button class="add-member-btn" onclick="addEvRecord()">＋ 新增</button>
       </div>
     </div>
@@ -806,6 +816,46 @@
     <div class="pay-btn-row" style="margin-top:20px;">
       <button class="pay-btn cancel" id="confirmCancelBtn">取消</button>
       <button class="pay-btn confirm" id="confirmOkBtn">確定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EV NUMPAD MODAL ══ -->
+<div class="modal-overlay" id="evNumpadModal">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-family:'Fredoka One';font-size:1rem;color:var(--pink);" id="evNumpadTitle">輸入度數</div>
+      <button onclick="closeEvNumpad()" style="
+        width:34px;height:34px;border-radius:50%;border:2px solid #E8D0DC;
+        background:white;font-size:1.1rem;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:2px 2px 0 #E8D0DC;color:var(--soft);font-family:'Fredoka One';">✕</button>
+    </div>
+    <div class="amount-display">
+      <span class="amount-icon" id="evNumpadIcon">⚡</span>
+      <span class="amount-dollar" id="evNumpadUnit">度</span>
+      <span class="amount-num" id="evAmNum" style="font-size:2rem;">0</span>
+    </div>
+    <div class="numpad">
+      <button class="num-btn" onclick="evNp('7')">7</button>
+      <button class="num-btn" onclick="evNp('8')">8</button>
+      <button class="num-btn" onclick="evNp('9')">9</button>
+      <button class="num-btn" onclick="evNp('÷')">÷</button>
+      <button class="num-btn ac" onclick="evNp('AC')">AC</button>
+      <button class="num-btn" onclick="evNp('4')">4</button>
+      <button class="num-btn" onclick="evNp('5')">5</button>
+      <button class="num-btn" onclick="evNp('6')">6</button>
+      <button class="num-btn" onclick="evNp('×')">×</button>
+      <button class="num-btn" onclick="evNp('⌫')">⌫</button>
+      <button class="num-btn" onclick="evNp('1')">1</button>
+      <button class="num-btn" onclick="evNp('2')">2</button>
+      <button class="num-btn" onclick="evNp('3')">3</button>
+      <button class="num-btn" onclick="evNp('+')">+</button>
+      <button class="num-btn ok" onclick="confirmEvNumpad()">OK</button>
+      <button class="num-btn" onclick="evNp('00')">00</button>
+      <button class="num-btn" onclick="evNp('0')">0</button>
+      <button class="num-btn" onclick="evNp('.')">.</button>
+      <button class="num-btn" onclick="evNp('-')">-</button>
     </div>
   </div>
 </div>
@@ -1203,6 +1253,17 @@ function getAmt(){
 function submitExp(){
   const amount=getAmt();
   if(!amount||amount<=0){showToast('金額不能為 0 🥺');return;}
+  const nowMonth2 = new Date().toISOString().substr(0,7);
+  // 若是補登過去月份，先跳確認視窗
+  if(curMonth !== nowMonth2){
+    const lbl = moLabel(curMonth);
+    showConfirm(`確定要補登到 ${lbl}？`, '📅', ()=>{ doSaveEntry(); });
+    return;
+  }
+  doSaveEntry();
+}
+function doSaveEntry(){
+  const amount=getAmt();
   const d=getData();
   if(!d.entries[curMonth])d.entries[curMonth]=[];
   const note=document.getElementById('amNote').value.trim();
@@ -1212,7 +1273,6 @@ function submitExp(){
   if(curMonth === nowMonth2){
     ds = `${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
   } else {
-    // 補登其他月份：標記為補登日期（用今天日期加 * 提示）
     ds = `${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}＊`;
   }
   let lineIcon,lineName,lineType;
@@ -1572,21 +1632,10 @@ function openAdd(){
   document.getElementById('amNote').value='';
   document.getElementById('otherIncNote').value='';
   setMode('expense');renderCatGrid();
-  const nowMonth = new Date().toISOString().substr(0,7);
   const banner = document.getElementById('wrongMonthBanner');
   const confirmed = document.getElementById('wrongMonthConfirmed');
-  const bannerLbl = document.getElementById('wrongMonthLabel');
-  const confirmedLbl = document.getElementById('wrongMonthConfirmedLabel');
-  if(curMonth !== nowMonth){
-    const lbl = moLabel(curMonth);
-    if(bannerLbl) bannerLbl.textContent = lbl;
-    if(confirmedLbl) confirmedLbl.textContent = lbl;
-    if(banner){ banner.style.display='block'; banner.style.animation='none'; void banner.offsetWidth; banner.style.animation='bannerShake 0.4s ease'; }
-    if(confirmed) confirmed.style.display='none';
-  } else {
-    if(banner) banner.style.display='none';
-    if(confirmed) confirmed.style.display='none';
-  }
+  if(banner) banner.style.display='none';
+  if(confirmed) confirmed.style.display='none';
   document.getElementById('addModal').classList.add('show');
 }
 function switchToNowAndAdd(){
@@ -1933,29 +1982,79 @@ function refreshAll(){
 //  EV ELECTRICITY
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  EV NUMPAD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+let evNumStr='0', evNumExpr='', evNumTarget='meter';
+
+function openEvNumpad(target){
+  evNumTarget = target;
+  const isMeter = target === 'meter';
+  evNumStr = isMeter
+    ? (document.getElementById('evCurMeterVal').textContent.trim() || '0')
+    : (document.getElementById('evPriceVal').textContent.trim() || '0');
+  if(evNumStr === '0') evNumStr = '0';
+  evNumExpr = '';
+  document.getElementById('evAmNum').textContent = evNumStr;
+  document.getElementById('evNumpadTitle').textContent = isMeter ? '輸入抄表度數' : '輸入單價（元/度）';
+  document.getElementById('evNumpadIcon').textContent = isMeter ? '⚡' : '💲';
+  document.getElementById('evNumpadUnit').textContent = isMeter ? '度' : '元/度';
+  document.getElementById('evNumpadModal').classList.add('show');
+}
+function closeEvNumpad(){
+  document.getElementById('evNumpadModal').classList.remove('show');
+}
+function evNp(k){
+  if(k==='AC'){evNumStr='0';evNumExpr='';}
+  else if(k==='⌫'){evNumStr=evNumStr.length>1?evNumStr.slice(0,-1):'0';}
+  else if(['+','-','×','÷'].includes(k)){evNumExpr=evNumStr+k;evNumStr='0';}
+  else if(k==='.'){if(!evNumStr.includes('.'))evNumStr+=k;}
+  else{evNumStr=(evNumStr==='0'&&k!=='.')?k:evNumStr+k;}
+  document.getElementById('evAmNum').textContent=evNumStr;
+}
+function getEvAmt(){
+  const b=parseFloat(evNumStr)||0;
+  if(evNumExpr){
+    const a=parseFloat(evNumExpr)||0;
+    if(evNumExpr.indexOf('+')!==-1)return a+b;
+    if(evNumExpr.indexOf('-')!==-1)return a-b;
+    if(evNumExpr.indexOf('×')!==-1)return a*b;
+    if(evNumExpr.indexOf('÷')!==-1)return b!==0?a/b:0;
+  }
+  return b;
+}
+function confirmEvNumpad(){
+  const val = getEvAmt();
+  if(evNumTarget === 'meter'){
+    document.getElementById('evCurMeterVal').textContent = val % 1 === 0 ? String(val) : val.toFixed(1);
+  } else {
+    document.getElementById('evPriceVal').textContent = val % 1 === 0 ? String(val) : val.toFixed(2);
+  }
+  closeEvNumpad();
+}
+document.getElementById('evNumpadModal').addEventListener('click',e=>{if(e.target.id==='evNumpadModal')closeEvNumpad();});
+
 function addEvRecord(){
   const y = document.getElementById('evYear').value;
   const m = document.getElementById('evMonthSel').value;
   const monthVal = y && m ? `${y}-${m}` : '';
-  const cur = parseFloat(document.getElementById('evCurMeter').value);
-  const price = parseFloat(document.getElementById('evPrice').value);
+  const cur = parseFloat(document.getElementById('evCurMeterVal').textContent) || 0;
+  const price = parseFloat(document.getElementById('evPriceVal').textContent) || 0;
   if(!monthVal){ showToast('請選擇帳單年月 🥺'); return; }
   if(!cur || cur <= 0){ showToast('請輸入正確度數 🥺'); return; }
   if(!price || price <= 0){ showToast('請輸入正確單價 🥺'); return; }
   const records = getEvData();
   const label = `${y}年${parseInt(m)}月電車費`;
-  // Find prev meter: last record sorted by date before this one
   const sorted = [...records].sort((a,b)=>a.id-b.id);
   const prev = sorted.length > 0 ? sorted[sorted.length-1].curMeter : 0;
   const usage = parseFloat((cur - prev).toFixed(1));
   if(usage < 0){ showToast('度數不能小於上次紀錄 🥺'); return; }
   const amount = Math.round(usage * price);
   records.push({ id: Date.now(), label, monthVal, prevMeter: prev, curMeter: cur, usage, price, amount });
-  // Sort by monthVal
   records.sort((a,b)=>(a.monthVal||'').localeCompare(b.monthVal||''));
   saveEvData(records);
-  document.getElementById('evCurMeter').value = '';
-  document.getElementById('evPrice').value = '';
+  document.getElementById('evCurMeterVal').textContent = '0';
+  document.getElementById('evPriceVal').textContent = '0';
   refreshEv();
   refreshAll();
   showToast('✅ 已新增電費紀錄！');
