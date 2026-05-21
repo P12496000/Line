@@ -735,6 +735,22 @@
           <span class="line-toggle-slider"></span>
         </label>
       </div>
+      <!-- LINE 群組 ID 設定 -->
+      <div style="padding:12px 15px 14px;border-top:2px solid var(--pink-pale);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-family:'Fredoka One';font-size:0.88rem;color:var(--text);">👥 LINE 群組 ID</div>
+          <div id="lineGroupIdStatus" style="font-size:0.75rem;color:var(--soft);">⚠️ 尚未設定</div>
+        </div>
+        <div style="font-size:0.73rem;color:var(--soft);margin-bottom:10px;line-height:1.5;">
+          將 Bot 加入群組後，傳送 <strong style="color:var(--pink);">/groupid</strong> 取得群組 ID，貼上後儲存即可發送到群組。
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input id="lineGroupIdInput" class="field-input"
+            style="margin-bottom:0;flex:1;font-size:0.85rem;padding:10px 12px;"
+            placeholder="C 開頭的群組 ID..." maxlength="80">
+          <button onclick="saveLineGroupId()" class="add-member-btn">💾 儲存</button>
+        </div>
+      </div>
     </div>
   </div>
   <div style="padding:8px 16px 8px;">
@@ -2275,20 +2291,44 @@ function calcBalance(d, month){
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  LINE NOTIFY
+//  LINE NOTIFY (群組)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 const LINE_TOKEN = '16oCGNi/nAAlHCr+0Sv49RpfVbsantOrlRY3bVacoO9CcoQGeUjdS5O8AFtjVRRohHD9ooDIdCSRdpqN0Gr+3ySJJWHAHiZQiI8O1e3q72pQISj9KUBvI+Wn1qLBLm3HfJFlCsWObB2UUUwvfuFJmAdB04t89/1O/w1cDnyilFU=';
-const LINE_USER = 'U1029d6dd84e4df39312f6f2bca01e2c2';
+
+function getLineGroupId(){
+  return localStorage.getItem('lineGroupId') || '';
+}
+function setLineGroupId(id){
+  localStorage.setItem('lineGroupId', id.trim());
+  initLineGroupId();
+}
+function initLineGroupId(){
+  const inp = document.getElementById('lineGroupIdInput');
+  const lbl = document.getElementById('lineGroupIdStatus');
+  const gid = getLineGroupId();
+  if(inp) inp.value = gid;
+  if(lbl) lbl.textContent = gid ? '✅ 已設定' : '⚠️ 尚未設定';
+}
+function saveLineGroupId(){
+  const inp = document.getElementById('lineGroupIdInput');
+  if(!inp) return;
+  const val = inp.value.trim();
+  if(!val){ showToast('⚠️ 請輸入群組 ID'); return; }
+  setLineGroupId(val);
+  showToast('✅ LINE 群組 ID 已儲存！');
+}
 
 async function sendLineNotify(msg){
   if(!lineNotifyEnabled) return;
+  const groupId = getLineGroupId();
+  if(!groupId){ console.log('LINE group ID not set'); return; }
   try{
     const GAS_URL='https://script.google.com/macros/s/AKfycbyFwSERo0WoIOSUUUIkaMdIvdr9zHwy3ZI8DILcvwDLxMkdxbTi3UFXrpwpx3l8uaM2/exec';
     await fetch(GAS_URL,{
       method:'POST',
       mode:'no-cors',
       headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({to:LINE_USER, message:msg})
+      body:JSON.stringify({to: groupId, message: msg})
     });
   }catch(e){console.log('LINE notify error',e);}
 }
@@ -2447,6 +2487,7 @@ function initLineToggle(){
   const lbl = document.getElementById('lineToggleLabel');
   if(cb){ cb.checked = lineNotifyEnabled; }
   if(lbl){ lbl.textContent = lineNotifyEnabled ? '已開啟' : '已關閉'; }
+  initLineGroupId();
 }
 
 </script>
