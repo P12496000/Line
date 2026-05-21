@@ -617,6 +617,26 @@
 </head>
 <body>
 
+<!-- ══ LOADING SCREEN ══ -->
+<div id="loadingScreen" style="
+  position:fixed; inset:0; background:#fff5f8;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  z-index:9999; gap:16px;
+">
+  <div style="font-size:52px; animation:loadPulse 1s ease-in-out infinite;">🌸</div>
+  <div style="font-size:16px; color:#FF6B8A; font-weight:600; letter-spacing:1px;">載入中...</div>
+  <div style="width:160px; height:4px; background:#ffd6e0; border-radius:99px; overflow:hidden;">
+    <div id="loadBar" style="width:0%; height:100%; background:linear-gradient(90deg,#FF6B8A,#FFB3C6); border-radius:99px; transition:width 0.4s ease;"></div>
+  </div>
+</div>
+<style>
+@keyframes loadPulse {
+  0%,100%{transform:scale(1);opacity:1;}
+  50%{transform:scale(1.15);opacity:0.8;}
+}
+</style>
+
 <!-- Blob bg -->
 <div class="bg-blob blob1"></div>
 <div class="bg-blob blob2"></div>
@@ -1053,6 +1073,21 @@
 //  STORAGE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  LOADING SCREEN HELPERS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+function hideLoadingScreen(){
+  const el = document.getElementById('loadingScreen');
+  if(!el) return;
+  el.style.transition = 'opacity 0.35s ease';
+  el.style.opacity = '0';
+  setTimeout(() => el.remove(), 380);
+}
+function setLoadBar(pct){
+  const b = document.getElementById('loadBar');
+  if(b) b.style.width = pct + '%';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  FIREBASE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 const firebaseConfig = {
@@ -1074,26 +1109,73 @@ const FB_EV_REF = db.ref('ev/' + ROOM);
 let _cache = {members:[],entries:{},defaultAmt:1500};
 let _evCache = [];
 let _fbReady = false;
+let _evReady = false;
+let _loadingHidden = false;
 
-// Listen for real-time updates
-FB_REF.on('value', snap => {
-  _cache = snap.val() || {members:[],entries:{},defaultAmt:1500};
-  _fbReady = true;
+function _tryHideLoading(){
+  if(_loadingHidden) return;
+  if(_fbReady){
+    _loadingHidden = true;
+    setLoadBar(100);
+    setTimeout(hideLoadingScreen, 200);
+  }
+}
+
+function _doRefresh(){
   if(document.readyState === 'complete' || document.readyState === 'interactive'){
     refreshAll();
   } else {
     document.addEventListener('DOMContentLoaded', refreshAll);
   }
+}
+
+// ── Pre-load from localStorage for instant first paint ──
+(function(){
+  try {
+    const cacheKey = 'fb_cache_' + (location.hash.replace('#','') || 'default');
+    const evKey    = 'fb_ev_cache_' + (location.hash.replace('#','') || 'default');
+    const raw = localStorage.getItem(cacheKey);
+    const rawEv = localStorage.getItem(evKey);
+    if(raw){
+      _cache = JSON.parse(raw);
+      _evCache = rawEv ? JSON.parse(rawEv) : [];
+      _fbReady = true;
+      _evReady = true;
+      _loadingHidden = true;
+      setLoadBar(80);
+      hideLoadingScreen();
+      _doRefresh();
+    } else {
+      // No cache yet — animate the bar to show progress
+      setLoadBar(30);
+      setTimeout(()=>setLoadBar(55), 400);
+      setTimeout(()=>setLoadBar(75), 900);
+    }
+  } catch(e){}
+})();
+
+// ── Listen for real-time updates ──
+FB_REF.on('value', snap => {
+  _cache = snap.val() || {members:[],entries:{},defaultAmt:1500};
+  _fbReady = true;
+  try {
+    const cacheKey = 'fb_cache_' + ROOM;
+    localStorage.setItem(cacheKey, JSON.stringify(_cache));
+  } catch(e){}
+  _tryHideLoading();
+  _doRefresh();
 }, err => {
+  hideLoadingScreen();
   showToast('Firebase錯誤：' + err.code);
 });
 FB_EV_REF.on('value', snap => {
   _evCache = snap.val() || [];
-  if(_fbReady){
-    if(document.readyState === 'complete' || document.readyState === 'interactive'){
-      refreshAll();
-    }
-  }
+  _evReady = true;
+  try {
+    const evKey = 'fb_ev_cache_' + ROOM;
+    localStorage.setItem(evKey, JSON.stringify(_evCache));
+  } catch(e){}
+  if(_fbReady) _doRefresh();
 }, err => {
   showToast('EV錯誤：' + err.code);
 });
