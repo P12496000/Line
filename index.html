@@ -469,8 +469,12 @@
     80%{transform:translateX(3px);}
   }
 
+  .empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 30px 16px; text-align: center; width: 100%;
+  }
   .empty .ee { font-size: 3.2rem; margin-bottom: 8px; display: block; }
-  .empty p { font-family: 'Fredoka One', cursive; font-size: 0.9rem; }
+  .empty p { font-family: 'Fredoka One', cursive; font-size: 0.9rem; color: var(--soft); }
 
   /* ── LINE TOGGLE SWITCH ── */
   .line-toggle-wrap {
@@ -695,7 +699,16 @@
 <!-- ══ ADD MODAL ══ -->
 <div class="modal-overlay" id="addModal">
   <div class="modal-sheet">
-    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div class="modal-handle" style="margin:0;flex:1;"></div>
+      <button onclick="closeAdd()" style="
+        width:34px;height:34px;border-radius:50%;border:2px solid #E8D0DC;
+        background:white;font-size:1.1rem;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:2px 2px 0 #E8D0DC;color:var(--soft);
+        font-family:'Fredoka One';flex-shrink:0;
+      ">✕</button>
+    </div>
 
     <!-- 非當月防呆 Banner -->
     <div id="wrongMonthBanner" style="display:none;
