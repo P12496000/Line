@@ -1254,6 +1254,7 @@ let _evCache = [];
 let _fbReady = false;
 let _evReady = false;
 let _loadingHidden = false;
+let _firstRenderDone = false;
 
 function _tryHideLoading(){
   if(_loadingHidden) return;
@@ -1746,36 +1747,46 @@ function refreshHome(){
   const donutExp=document.getElementById('donutExp');
   const donutBal=document.getElementById('donutBal');
   const donutSvg=document.getElementById('donutSvg');
-  // Reset to 0 instantly (no transition)
-  donutExp.style.transition='none';
-  donutBal.style.transition='none';
-  donutExp.setAttribute('stroke-dasharray',`0 ${circ}`);
-  donutBal.setAttribute('stroke-dasharray',`0 ${circ}`);
-  donutExp.setAttribute('stroke-dashoffset','0');
-  donutBal.setAttribute('stroke-dashoffset','0');
-  // Trigger animation on next frame
-  requestAnimationFrame(()=>{
+  const totalBase=prevBal+totInc;
+  const ep=totalBase>0?Math.min(totExp/totalBase,1)*circ:0;
+  const bp=totalBase>0?Math.max((totalBase-totExp)/totalBase,0)*circ:0;
+  if(!_firstRenderDone){
+    // 第一次：從 0 播放入場動畫
+    _firstRenderDone=true;
+    donutExp.style.transition='none';
+    donutBal.style.transition='none';
+    donutExp.setAttribute('stroke-dasharray',`0 ${circ}`);
+    donutBal.setAttribute('stroke-dasharray',`0 ${circ}`);
+    donutExp.setAttribute('stroke-dashoffset','0');
+    donutBal.setAttribute('stroke-dashoffset','0');
     requestAnimationFrame(()=>{
-      donutExp.style.transition='stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1)';
-      donutBal.style.transition='stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1)';
-      const totalBase=prevBal+totInc;
-      if(totalBase<=0){
-        // show empty ring pulse
-        donutSvg.classList.add('ring-empty');
-        return;
-      }
-      const ep=Math.min(totExp/totalBase,1)*circ;
-      const bp=Math.max((totalBase-totExp)/totalBase,0)*circ;
+      requestAnimationFrame(()=>{
+        donutExp.style.transition='stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1)';
+        donutBal.style.transition='stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1)';
+        if(totalBase<=0){ donutSvg.classList.add('ring-empty'); return; }
+        donutExp.setAttribute('stroke-dasharray',`${ep} ${circ-ep}`);
+        donutExp.setAttribute('stroke-dashoffset','0');
+        donutBal.setAttribute('stroke-dasharray',`${bp} ${circ-bp}`);
+        donutBal.setAttribute('stroke-dashoffset',`${-ep}`);
+        donutSvg.classList.remove('donut-ring-pulse');
+        void donutSvg.offsetWidth;
+        donutSvg.classList.add('donut-ring-pulse');
+      });
+    });
+  } else {
+    // Firebase 更新後：直接套用最終值，不重播動畫
+    donutExp.style.transition='none';
+    donutBal.style.transition='none';
+    if(totalBase<=0){
+      donutSvg.classList.add('ring-empty');
+    } else {
+      donutSvg.classList.remove('ring-empty');
       donutExp.setAttribute('stroke-dasharray',`${ep} ${circ-ep}`);
       donutExp.setAttribute('stroke-dashoffset','0');
       donutBal.setAttribute('stroke-dasharray',`${bp} ${circ-bp}`);
       donutBal.setAttribute('stroke-dashoffset',`${-ep}`);
-      // glow animation on svg
-      donutSvg.classList.remove('donut-ring-pulse');
-      void donutSvg.offsetWidth;
-      donutSvg.classList.add('donut-ring-pulse');
-    });
-  });
+    }
+  }
 
   // Member list + EV rows
   const mo=curMonth.split('-');
