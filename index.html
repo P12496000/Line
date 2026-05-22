@@ -636,15 +636,15 @@
 
 <!-- ══ LOADING SCREEN ══ -->
 <div id="loadingScreen" style="
-  position:fixed; inset:0; background:#fff5f8;
+  position:fixed; inset:0; background:var(--cream, #FFF8F2);
   display:flex; flex-direction:column;
   align-items:center; justify-content:center;
   z-index:9999; gap:16px;
 ">
-  <div style="font-size:52px; animation:loadPulse 1s ease-in-out infinite;">🌸</div>
+  <div style="font-size:52px; animation:loadPulse 0.8s ease-in-out infinite;">🌸</div>
   <div style="font-size:16px; color:#FF6B8A; font-weight:600; letter-spacing:1px;">載入中...</div>
   <div style="width:160px; height:4px; background:#ffd6e0; border-radius:99px; overflow:hidden;">
-    <div id="loadBar" style="width:0%; height:100%; background:linear-gradient(90deg,#FF6B8A,#FFB3C6); border-radius:99px; transition:width 0.4s ease;"></div>
+    <div id="loadBar" style="width:0%; height:100%; background:linear-gradient(90deg,#FF6B8A,#FFB3C6); border-radius:99px; transition:width 0.3s ease;"></div>
   </div>
 </div>
 <style>
@@ -697,19 +697,11 @@
     <div class="summary-pill">本月支出 📉<div class="val exp" id="expDisp">$ 0</div></div>
   </div>
 
-  <div class="section-title">🌸 收入公費</div>
-  <div class="list-card" id="memberPayList"></div>
-
   <div class="section-title" id="otherIncSection" style="display:none;">💰 其他收入</div>
   <div class="list-card" id="otherIncList" style="display:none;"></div>
 
   <div class="section-title">🛒 支出明細</div>
   <div class="list-card" id="expenseList"></div>
-  <div class="stats-grid" id="statsGrid"></div>
-  <div class="section-title">🏷️ 支出分類</div>
-  <div class="list-card" id="catBreak" style="margin-bottom:22px;"></div>
-  <div class="section-title">👥 成員繳費進度</div>
-  <div class="list-card" id="memStats" style="margin-bottom:22px;"></div>
 </div>
 
 <!-- ══ EV ELECTRICITY ══ -->
@@ -1027,59 +1019,174 @@
 (function(){
   const cv=document.getElementById('bgCanvas');
   const ctx=cv.getContext('2d');
-  const W=430, H=window.innerHeight;
+  let W=cv.offsetWidth||430, H=window.innerHeight;
   cv.width=W; cv.height=H;
+  window.addEventListener('resize',()=>{
+    W=cv.offsetWidth||430; H=window.innerHeight;
+    cv.width=W; cv.height=H;
+  });
   const rng=(a,b)=>Math.random()*(b-a)+a;
+  const ri=(a,b)=>Math.floor(rng(a,b));
 
-  // Falling petals
-  const petals=Array.from({length:26},()=>({
-    x:rng(0,W), y:rng(-H,H),
-    size:rng(5,12), speed:rng(0.25,0.8),
-    drift:rng(-0.25,0.25), angle:rng(0,Math.PI*2),
-    spin:rng(-0.012,0.012),
-    alpha:rng(0.12,0.32),
-    color:['#FFAAB8','#FFD6E0','#B8E4D8','#D4AAFF','#FFD6A5'][Math.floor(rng(0,5))]
-  }));
+  const COLORS=['#FFAAB8','#FFD6E0','#FFB3C6','#B8E4D8','#A8D8EA','#D4AAFF','#EEC9FF','#FFD6A5','#FFFACD'];
+  const PETAL_COLORS=['#FFAAB8','#FFD6E0','#FFB3C6','#FFE4EE','#FFC8D6'];
 
-  // Static bubbles
-  const bubbles=Array.from({length:14},()=>({
+  // ── Particle types: petal / heart / star / dot / sparkle ──
+  function makeParticle(){
+    const type=['petal','petal','petal','heart','star','dot','sparkle'][ri(0,7)];
+    return {
+      type,
+      x: rng(0,W),
+      y: rng(-H, 0),
+      size: type==='dot' ? rng(3,7) : rng(6,15),
+      speed: rng(0.3, 1.0),
+      drift: rng(-0.4, 0.4),
+      angle: rng(0, Math.PI*2),
+      spin: rng(-0.018, 0.018),
+      wobble: rng(0, Math.PI*2),
+      wobbleSpeed: rng(0.018, 0.045),
+      wobbleAmp: rng(0.3, 1.1),
+      alpha: rng(0.13, 0.38),
+      color: type==='petal' ? PETAL_COLORS[ri(0,PETAL_COLORS.length)] : COLORS[ri(0,COLORS.length)],
+      pulse: rng(0, Math.PI*2),
+      pulseSpeed: rng(0.02, 0.05),
+    };
+  }
+
+  const particles = Array.from({length:48}, makeParticle);
+  // spread them across screen at start
+  particles.forEach(p=>{ p.y=rng(-H, H); });
+
+  // ── Floating bubbles (slow gentle drift) ──
+  const bubbles=Array.from({length:10},()=>({
     x:rng(0,W), y:rng(0,H),
-    r:rng(6,22), alpha:rng(0.04,0.12),
-    color:['#FFAAB8','#B8E4D8','#D4AAFF'][Math.floor(rng(0,3))]
+    r:rng(5,18),
+    alpha:rng(0.04,0.10),
+    color:COLORS[ri(0,COLORS.length)],
+    vy: rng(-0.12,-0.04),
+    vx: rng(-0.06,0.06),
+    wobble: rng(0,Math.PI*2),
+    wobbleSpeed: rng(0.008,0.02),
   }));
 
+  // ── Draw helpers ──
   function drawPetal(x,y,size,angle,alpha,color){
     ctx.save();
     ctx.globalAlpha=alpha;
     ctx.translate(x,y); ctx.rotate(angle);
+    // two-lobe petal
     ctx.beginPath();
-    ctx.ellipse(0,-size*0.55,size*0.35,size*0.65,0,0,Math.PI*2);
+    ctx.ellipse(-size*0.18, -size*0.5, size*0.28, size*0.6, -0.25, 0, Math.PI*2);
+    ctx.fillStyle=color; ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(size*0.18, -size*0.5, size*0.28, size*0.6, 0.25, 0, Math.PI*2);
     ctx.fillStyle=color; ctx.fill();
     ctx.restore();
   }
 
+  function drawHeart(x,y,size,angle,alpha,color){
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.translate(x,y); ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(0, size*0.3);
+    ctx.bezierCurveTo(-size*0.6, -size*0.1, -size*0.6, -size*0.7, 0, -size*0.35);
+    ctx.bezierCurveTo(size*0.6, -size*0.7, size*0.6, -size*0.1, 0, size*0.3);
+    ctx.fillStyle=color; ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStar(x,y,size,angle,alpha,color){
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.translate(x,y); ctx.rotate(angle);
+    ctx.beginPath();
+    for(let i=0;i<5;i++){
+      const outerA = (Math.PI*2/5)*i - Math.PI/2;
+      const innerA = outerA + Math.PI/5;
+      if(i===0) ctx.moveTo(Math.cos(outerA)*size, Math.sin(outerA)*size);
+      else ctx.lineTo(Math.cos(outerA)*size, Math.sin(outerA)*size);
+      ctx.lineTo(Math.cos(innerA)*size*0.42, Math.sin(innerA)*size*0.42);
+    }
+    ctx.closePath();
+    ctx.fillStyle=color; ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSparkle(x,y,size,angle,alpha,color){
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.translate(x,y); ctx.rotate(angle);
+    ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.lineCap='round';
+    for(let i=0;i<4;i++){
+      const a=Math.PI/4*i;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*size*0.18, Math.sin(a)*size*0.18);
+      ctx.lineTo(Math.cos(a)*size, Math.sin(a)*size);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-Math.cos(a)*size*0.18, -Math.sin(a)*size*0.18);
+      ctx.lineTo(-Math.cos(a)*size, -Math.sin(a)*size);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawDot(x,y,size,alpha,color){
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.beginPath();
+    ctx.arc(x,y,size,0,Math.PI*2);
+    ctx.fillStyle=color; ctx.fill();
+    ctx.restore();
+  }
+
+  let t=0;
   function frame(){
+    t++;
     ctx.clearRect(0,0,W,H);
-    // Gradient bg
+
+    // Soft gradient background
     const g=ctx.createLinearGradient(0,0,W,H);
     g.addColorStop(0,'#FFF5F8');
-    g.addColorStop(0.5,'#FFF8F2');
+    g.addColorStop(0.45,'#FFF8F2');
     g.addColorStop(1,'#F5FFF8');
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 
-    // Static bubbles
+    // Floating bubbles
     bubbles.forEach(b=>{
+      b.wobble+=b.wobbleSpeed;
+      b.y+=b.vy; b.x+=b.vx+Math.sin(b.wobble)*0.08;
+      if(b.y<-b.r*2){ b.y=H+b.r; b.x=rng(0,W); }
       ctx.save(); ctx.globalAlpha=b.alpha;
+      // bubble with glossy shimmer
+      const grad=ctx.createRadialGradient(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.1,b.x,b.y,b.r);
+      grad.addColorStop(0,'rgba(255,255,255,0.55)');
+      grad.addColorStop(1,b.color+'99');
       ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
-      ctx.fillStyle=b.color; ctx.fill(); ctx.restore();
+      ctx.fillStyle=grad; ctx.fill();
+      ctx.strokeStyle=b.color+'44'; ctx.lineWidth=1;
+      ctx.stroke();
+      ctx.restore();
     });
 
-    // Petals
-    petals.forEach(p=>{
-      p.y+=p.speed; p.x+=p.drift; p.angle+=p.spin;
-      if(p.y>H+20){p.y=-20;p.x=rng(0,W);}
-      drawPetal(p.x,p.y,p.size,p.angle,p.alpha,p.color);
+    // Falling particles
+    particles.forEach(p=>{
+      p.wobble+=p.wobbleSpeed;
+      p.pulse+=p.pulseSpeed;
+      p.y+=p.speed;
+      p.x+=p.drift + Math.sin(p.wobble)*p.wobbleAmp;
+      p.angle+=p.spin;
+      // pulse alpha gently
+      const pa = p.alpha*(0.85+0.15*Math.sin(p.pulse));
+      if(p.y>H+24){ Object.assign(p, makeParticle()); p.y=-rng(10,40); p.x=rng(0,W); }
+      if(p.type==='petal')    drawPetal(p.x,p.y,p.size,p.angle,pa,p.color);
+      else if(p.type==='heart')  drawHeart(p.x,p.y,p.size*0.9,p.angle,pa,p.color);
+      else if(p.type==='star')   drawStar(p.x,p.y,p.size*0.7,p.angle,pa,p.color);
+      else if(p.type==='sparkle')drawSparkle(p.x,p.y,p.size*0.8,p.angle,pa,p.color);
+      else                       drawDot(p.x,p.y,p.size*0.5,pa,p.color);
     });
+
     requestAnimationFrame(frame);
   }
   frame();
@@ -1094,14 +1201,24 @@
 function hideLoadingScreen(){
   const el = document.getElementById('loadingScreen');
   if(!el) return;
-  el.style.transition = 'opacity 0.35s ease';
+  if(el._hidden) return;
+  el._hidden = true;
+  el.style.transition = 'opacity 0.22s ease';
   el.style.opacity = '0';
-  setTimeout(() => el.remove(), 380);
+  setTimeout(() => { if(el.parentNode) el.remove(); }, 240);
 }
 function setLoadBar(pct){
   const b = document.getElementById('loadBar');
   if(b) b.style.width = pct + '%';
 }
+// 最多等 3 秒，超時強制顯示主畫面（避免網路慢卡住）
+setTimeout(()=>{
+  if(!_loadingHidden){
+    _loadingHidden = true;
+    hideLoadingScreen();
+    if(!_fbReady) showToast('⚠️ 網路較慢，顯示離線資料');
+  }
+}, 3000);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  FIREBASE
@@ -1133,7 +1250,7 @@ function _tryHideLoading(){
   if(_fbReady){
     _loadingHidden = true;
     setLoadBar(100);
-    setTimeout(hideLoadingScreen, 200);
+    hideLoadingScreen();
   }
 }
 
@@ -1158,14 +1275,14 @@ function _doRefresh(){
       _fbReady = true;
       _evReady = true;
       _loadingHidden = true;
-      setLoadBar(80);
+      // 有快取：立刻顯示主畫面，不等 Firebase
       hideLoadingScreen();
       _doRefresh();
     } else {
-      // No cache yet — animate the bar to show progress
-      setLoadBar(30);
-      setTimeout(()=>setLoadBar(55), 400);
-      setTimeout(()=>setLoadBar(75), 900);
+      // 無快取：動畫進度條，最多等 3 秒（超時由上方 setTimeout 處理）
+      setLoadBar(20);
+      setTimeout(()=>setLoadBar(45), 300);
+      setTimeout(()=>setLoadBar(70), 800);
     }
   } catch(e){}
 })();
@@ -1725,7 +1842,7 @@ function refreshHome(){
       <div class="list-item">
         <div class="item-icon ${iconCls[i%4]}">${e.icon}</div>
         <div class="item-info">
-          <div class="item-name">${e.cat}${e.note?' ：'+e.note:''}</div>
+          <div class="item-name">${e.note||e.cat}</div>
           <div class="item-date">${e.date}</div>
         </div>
         <div class="item-amount exp">-${e.amount.toLocaleString()}</div>
