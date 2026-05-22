@@ -626,6 +626,110 @@
     transform: translateX(24px);
   }
 
+  /* ════════════════════════════════════════
+     ✨ POLISH PASS — soft glow / micro motion
+     ════════════════════════════════════════ */
+
+  /* 1) 卡片微光暈：在原有 4px 4px 硬陰影之外，疊一層柔光 */
+  .list-card {
+    box-shadow:
+      4px 4px 0 #3A2A3A,
+      0 8px 24px rgba(232,130,154,0.08),
+      inset 0 0 0 1px rgba(255,228,236,0.6);
+  }
+  .summary-pill {
+    box-shadow:
+      3px 3px 0 #3A2A3A,
+      0 6px 18px rgba(232,130,154,0.07),
+      inset 0 0 0 1px rgba(255,228,236,0.55);
+  }
+  .stat-box {
+    box-shadow:
+      3px 3px 0 #3A2A3A,
+      0 6px 18px rgba(232,130,154,0.07),
+      inset 0 0 0 1px rgba(255,228,236,0.55);
+  }
+
+  /* 2) Donut 柔光圈（疊加在原本的 breath glow 上）*/
+  .donut-svg {
+    filter: drop-shadow(0 0 14px rgba(255,170,184,0.35))
+            drop-shadow(0 8px 28px rgba(232,130,154,0.28));
+  }
+  /* 數字 count-up 期間的微光（透過 .counting 觸發）*/
+  .donut-amount.counting {
+    text-shadow:
+      0 0 12px rgba(255,170,184,0.55),
+      0 2px 8px rgba(232,130,154,0.30) !important;
+  }
+
+  /* 3) Tab 切換彈跳（增強原本的 active 動畫，含底線展開）*/
+  .tab-item .tab-icon {
+    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1),
+                filter 0.2s;
+  }
+  .tab-item.active .tab-icon {
+    animation: tabBounce 0.45s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes tabBounce {
+    0%   { transform: translateY(0) scale(1) rotate(0deg); }
+    40%  { transform: translateY(-6px) scale(1.25) rotate(-8deg); }
+    70%  { transform: translateY(-3px) scale(1.18) rotate(4deg); }
+    100% { transform: translateY(-4px) scale(1.3) rotate(0deg); }
+  }
+  /* 底下短線：從中間展開 */
+  .tab-item::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 50%;
+    width: 0; height: 3px;
+    background: var(--pink);
+    border-radius: 99px;
+    transform: translateX(-50%);
+    transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+  .tab-item.active::after {
+    width: 28px;
+    box-shadow: 0 0 8px rgba(232,130,154,0.5);
+  }
+
+  /* 4) 成員頭像狀態光環 */
+  .member-row .item-icon {
+    position: relative;
+    transition: box-shadow 0.3s, border-color 0.3s;
+  }
+  /* 已繳：薄荷綠光環 */
+  .member-row.status-paid .item-icon {
+    border-color: var(--mint);
+    box-shadow:
+      0 0 0 3px rgba(125,201,190,0.25),
+      0 0 14px rgba(125,201,190,0.45);
+  }
+  /* 未繳：灰色虛線 */
+  .member-row.status-unpaid .item-icon {
+    border-style: dashed;
+    border-color: #B8A8B4;
+    opacity: 0.85;
+  }
+  /* 逾期：橘色脈動 */
+  .member-row.status-overdue .item-icon {
+    border-color: #FF9A4A;
+    animation: overdueRing 1.4s ease-in-out infinite;
+  }
+  @keyframes overdueRing {
+    0%, 100% {
+      box-shadow:
+        0 0 0 0 rgba(255,154,74,0.55),
+        0 0 8px rgba(255,154,74,0.4);
+    }
+    50% {
+      box-shadow:
+        0 0 0 6px rgba(255,154,74,0),
+        0 0 14px rgba(255,154,74,0.7);
+    }
+  }
+  /* 已繳成員列：不再灰掉，光環說明一切 */
+  .member-row.status-paid.unpaid-row { opacity: 1; }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1034,10 +1138,65 @@
 
   const COLORS=['#FFAAB8','#FFD6E0','#FFB3C6','#B8E4D8','#A8D8EA','#D4AAFF','#EEC9FF','#FFD6A5','#FFFACD'];
   const PETAL_COLORS=['#FFAAB8','#FFD6E0','#FFB3C6','#FFE4EE','#FFC8D6'];
+  const MAPLE_COLORS =['#FF8A4A','#E85A2A','#FFB070','#D94820','#FFA060'];
+  const SNOW_COLORS  =['#FFFFFF','#E8F4FF','#D6EEFF','#F0F8FF'];
+  const HEART_COLORS =['#FF6B8A','#FF8AAB','#FFAAC0','#FFB3C6','#FF5577'];
 
-  // ── Particle types: petal / heart / star / dot / sparkle ──
+  // ── 季節主題：依當前月份決定粒子組合 ──
+  //  3-5 月 春 櫻花 🌸 / 6-8 月 夏 閃光 ✨ / 9-11 月 秋 楓葉 🍁 / 1-2 月 冬 雪花 ❄️ / 12 月 愛心 ❤️
+  function getSeasonTheme(){
+    const m = new Date().getMonth() + 1;
+    if (m === 12)               return 'love';
+    if (m >= 3 && m <= 5)       return 'spring';
+    if (m >= 6 && m <= 8)       return 'summer';
+    if (m >= 9 && m <= 11)      return 'autumn';
+    return 'winter'; // 1, 2 月
+  }
+  let SEASON = getSeasonTheme();
+  // 每小時重新偵測一次（跨午夜/跨月時自動切換）
+  setInterval(()=>{ SEASON = getSeasonTheme(); }, 3600000);
+
+  // ── Particle types: petal / heart / star / dot / sparkle / maple / snow ──
   function makeParticle(){
-    const type=['petal','petal','petal','heart','star','dot','sparkle'][ri(0,7)];
+    // 依季節決定類型權重
+    let pool, colorPick;
+    switch(SEASON){
+      case 'spring':
+        // 櫻花為主，少許星點
+        pool = ['petal','petal','petal','petal','petal','dot','sparkle'];
+        colorPick = (t)=> t==='petal'
+          ? PETAL_COLORS[ri(0,PETAL_COLORS.length)]
+          : COLORS[ri(0,COLORS.length)];
+        break;
+      case 'summer':
+        // 閃光為主
+        pool = ['sparkle','sparkle','sparkle','star','star','dot','dot'];
+        colorPick = ()=> COLORS[ri(0,COLORS.length)];
+        break;
+      case 'autumn':
+        // 楓葉（用 petal 形狀 + 橘紅色）+ 一點 dot
+        pool = ['maple','maple','maple','maple','dot','sparkle'];
+        colorPick = (t)=> t==='maple'
+          ? MAPLE_COLORS[ri(0,MAPLE_COLORS.length)]
+          : MAPLE_COLORS[ri(0,MAPLE_COLORS.length)];
+        break;
+      case 'winter':
+        // 雪花
+        pool = ['snow','snow','snow','snow','sparkle','dot'];
+        colorPick = ()=> SNOW_COLORS[ri(0,SNOW_COLORS.length)];
+        break;
+      case 'love':
+        // 12 月愛心
+        pool = ['heart','heart','heart','heart','sparkle','dot'];
+        colorPick = (t)=> t==='heart'
+          ? HEART_COLORS[ri(0,HEART_COLORS.length)]
+          : COLORS[ri(0,COLORS.length)];
+        break;
+      default:
+        pool = ['petal','petal','heart','star','dot','sparkle'];
+        colorPick = ()=> COLORS[ri(0,COLORS.length)];
+    }
+    const type = pool[ri(0, pool.length)];
     return {
       type,
       x: rng(0,W),
@@ -1051,7 +1210,7 @@
       wobbleSpeed: rng(0.018, 0.045),
       wobbleAmp: rng(0.3, 1.1),
       alpha: rng(0.13, 0.38),
-      color: type==='petal' ? PETAL_COLORS[ri(0,PETAL_COLORS.length)] : COLORS[ri(0,COLORS.length)],
+      color: colorPick(type),
       pulse: rng(0, Math.PI*2),
       pulseSpeed: rng(0.02, 0.05),
     };
@@ -1145,6 +1304,54 @@
     ctx.restore();
   }
 
+  // 楓葉：五瓣星形變體
+  function drawMaple(x,y,size,angle,alpha,color){
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.translate(x,y); ctx.rotate(angle);
+    ctx.beginPath();
+    const pts = 5;
+    for(let i=0; i<pts*2; i++){
+      const a = (Math.PI/pts)*i - Math.PI/2;
+      const r = (i%2===0) ? size : size*0.45;
+      const px = Math.cos(a)*r;
+      const py = Math.sin(a)*r;
+      if(i===0) ctx.moveTo(px,py);
+      else      ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+    ctx.fillStyle=color; ctx.fill();
+    // 葉柄
+    ctx.strokeStyle=color; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(0,size*0.4); ctx.lineTo(0,size*0.9); ctx.stroke();
+    ctx.restore();
+  }
+
+  // 雪花：六角放射線
+  function drawSnow(x,y,size,angle,alpha,color){
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.translate(x,y); ctx.rotate(angle);
+    ctx.strokeStyle=color; ctx.lineWidth=1.4; ctx.lineCap='round';
+    for(let i=0;i<6;i++){
+      const a = (Math.PI/3)*i;
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(Math.cos(a)*size, Math.sin(a)*size);
+      ctx.stroke();
+      // 小分叉
+      const bx = Math.cos(a)*size*0.55, by = Math.sin(a)*size*0.55;
+      const ang1 = a + Math.PI/6, ang2 = a - Math.PI/6;
+      ctx.beginPath();
+      ctx.moveTo(bx,by);
+      ctx.lineTo(bx + Math.cos(ang1)*size*0.25, by + Math.sin(ang1)*size*0.25);
+      ctx.moveTo(bx,by);
+      ctx.lineTo(bx + Math.cos(ang2)*size*0.25, by + Math.sin(ang2)*size*0.25);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   let t=0;
   let _animPaused = false;
   document.addEventListener('visibilitychange', () => { _animPaused = document.hidden; });
@@ -1191,6 +1398,8 @@
       else if(p.type==='heart')  drawHeart(p.x,p.y,p.size*0.9,p.angle,pa,p.color);
       else if(p.type==='star')   drawStar(p.x,p.y,p.size*0.7,p.angle,pa,p.color);
       else if(p.type==='sparkle')drawSparkle(p.x,p.y,p.size*0.8,p.angle,pa,p.color);
+      else if(p.type==='maple')  drawMaple(p.x,p.y,p.size*0.8,p.angle,pa,p.color);
+      else if(p.type==='snow')   drawSnow(p.x,p.y,p.size*0.85,p.angle,pa,p.color);
       else                       drawDot(p.x,p.y,p.size*0.5,pa,p.color);
     });
 
@@ -1709,18 +1918,22 @@ function refreshHome(){
       }
     });
   }
-  // Counter roll animation
-  const duration=600;
+  // Counter roll animation (800ms with soft glow)
+  const duration=800;
   const start=performance.now();
   const from=prevVal;
   const to=bal;
+  balEl.classList.add('counting');
   function tick(now){
     const t=Math.min((now-start)/duration,1);
     const ease=1-Math.pow(1-t,3);
     const cur=Math.round(from+(to-from)*ease);
     balEl.textContent='$ '+Math.abs(cur).toLocaleString();
     if(t<1) requestAnimationFrame(tick);
-    else balEl.textContent='$ '+Math.abs(to).toLocaleString();
+    else {
+      balEl.textContent='$ '+Math.abs(to).toLocaleString();
+      balEl.classList.remove('counting');
+    }
   }
   requestAnimationFrame(tick);
 
@@ -1802,17 +2015,24 @@ function refreshHome(){
     const paid=incs.find(e=>e.member===m.name&&e.fixedPay);
     const esc=m.name.replace(/'/g,"\'");
     const defaultAmt=m.defaultAmt||d.defaultAmt||1500;
+    // 狀態判定：已繳 / 未繳 / 逾期 (過去月份且未繳)
+    const _now = new Date();
+    const _curYM = _now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0');
+    let statusCls;
+    if (paid) statusCls = 'status-paid';
+    else if (curMonth < _curYM) statusCls = 'status-overdue';
+    else statusCls = 'status-unpaid';
     const amtBadge=paid
       ?`<div class="badge-paid">+${paid.amount.toLocaleString()}</div>`
       :`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
-          <div class="badge-unpaid">未繳</div>
+          <div class="badge-unpaid">${statusCls==='status-overdue'?'逾期':'未繳'}</div>
           <div style="font-size:0.72rem;color:var(--soft);">應繳 $${defaultAmt.toLocaleString()}</div>
         </div>`;
     const paidDate = paid ? paid.date : '';
     const paidLabel = paid
       ? '已繳 ' + (paidDate ? paidDate + ' · ' : '') + mLbl
-      : '未繳 ('+mLbl+')';
-    return `<div class="member-row ${paid?'':'unpaid-row'}" onclick="openPayModal('${esc}')">
+      : (statusCls==='status-overdue' ? '⚠️ 逾期 ('+mLbl+')' : '未繳 ('+mLbl+')');
+    return `<div class="member-row ${statusCls} ${paid?'':'unpaid-row'}" onclick="openPayModal('${esc}')">
       <div class="item-icon plain">${m.avatar}</div>
       <div class="item-info">
         <div class="item-name">${m.name}</div>
@@ -1823,13 +2043,19 @@ function refreshHome(){
   });
     const evRows=evRecs.map(r=>{
     const paid=isEvPaid(r);
-    return `<div class="member-row ${paid?'':'unpaid-row'}" onclick="openEvPayModal(${r.id})">
+    const _now2 = new Date();
+    const _curYM2 = _now2.getFullYear()+'-'+String(_now2.getMonth()+1).padStart(2,'0');
+    let evStatusCls;
+    if (paid) evStatusCls = 'status-paid';
+    else if (r.monthVal < _curYM2) evStatusCls = 'status-overdue';
+    else evStatusCls = 'status-unpaid';
+    return `<div class="member-row ${evStatusCls} ${paid?'':'unpaid-row'}" onclick="openEvPayModal(${r.id})">
       <div class="item-icon plain">⚡</div>
       <div class="item-info" style="${paid?'':'opacity:0.5;'}">
         <div class="item-name">${r.label}</div>
-        <div class="item-date">${paid?'已繳電車費':'未繳電車費'}</div>
+        <div class="item-date">${paid?'已繳電車費':(evStatusCls==='status-overdue'?'⚠️ 逾期電車費':'未繳電車費')}</div>
       </div>
-      ${paid?'<div class=\"badge-paid\">+'+r.amount.toLocaleString()+'</div>':'<div class=\"badge-unpaid\">未繳</div>'}
+      ${paid?'<div class=\"badge-paid\">+'+r.amount.toLocaleString()+'</div>':'<div class=\"badge-unpaid\">'+(evStatusCls==='status-overdue'?'逾期':'未繳')+'</div>'}
     </div>`;
   });
   const allRows=[...memberRows,...evRows];
