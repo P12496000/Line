@@ -1146,7 +1146,10 @@
   }
 
   let t=0;
+  let _animPaused = false;
+  document.addEventListener('visibilitychange', () => { _animPaused = document.hidden; });
   function frame(){
+    if(!_animPaused){
     t++;
     ctx.clearRect(0,0,W,H);
 
@@ -1192,6 +1195,9 @@
     });
 
     requestAnimationFrame(frame);
+    } else {
+      requestAnimationFrame(frame);
+    }
   }
   frame();
 })();
@@ -1332,7 +1338,11 @@ function getData(){
   }
   return d;
 }
-function save(d){ _cache = d; FB_REF.set(d); }
+function save(d){
+  _cache = d;
+  try { localStorage.setItem('fb_cache_' + ROOM, JSON.stringify(d)); } catch(e){}
+  FB_REF.set(d);
+}
 function getEvData(){ return Array.isArray(_evCache) ? _evCache : Object.values(_evCache||{}); }
 function saveEvData(d){
   _evCache = d;
@@ -1687,15 +1697,17 @@ function refreshHome(){
   balEl.classList.remove('pop-anim','float-resume');
   void balEl.offsetWidth; // reflow
   balEl.classList.add('pop-anim');
-  // After pop, resume float
-  balEl.addEventListener('animationend', function onPopEnd(e){
-    if(e.animationName==='balPop'){
-      balEl.classList.remove('pop-anim');
-      void balEl.offsetWidth;
-      balEl.classList.add('float-resume');
-      balEl.removeEventListener('animationend', onPopEnd);
-    }
-  });
+  // After pop, resume float — use a single persistent listener (attach once)
+  if(!balEl._popListenerAttached){
+    balEl._popListenerAttached = true;
+    balEl.addEventListener('animationend', function(e){
+      if(e.animationName==='balPop'){
+        balEl.classList.remove('pop-anim');
+        void balEl.offsetWidth;
+        balEl.classList.add('float-resume');
+      }
+    });
+  }
   // Counter roll animation
   const duration=600;
   const start=performance.now();
@@ -2014,10 +2026,12 @@ function moneyFlyAnimation(){
   const H = window.innerHeight;
 
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr;
   canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
   overlay.appendChild(canvas);
   const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
 
   // ── Kid image (no background, PNG) ──
   const kidImg = new Image();
@@ -2724,7 +2738,6 @@ async function shareHomeScreenshot(){
   btn.textContent = '⏳ 截圖中...';
   btn.disabled = true;
   try {
-    // Temporarily hide UI chrome that shouldn't appear in screenshot
     const bottomTabs = document.querySelector('.bottom-tabs');
     const fab = document.getElementById('fab');
     const topNav = document.querySelector('.top-nav');
@@ -2736,32 +2749,49 @@ async function shareHomeScreenshot(){
     if(topNav) topNav.style.display = 'none';
 
     const page = document.getElementById('page-home');
-    const canvas = await html2canvas(page, {
-      backgroundColor: '#FFF5F8',
+    const pageH = page.scrollHeight;
+    const pageW = page.offsetWidth;
+
+    // Capture page content
+    const pageCanvas = await html2canvas(page, {
+      backgroundColor: null,
       scale: 2,
       useCORS: true,
       allowTaint: true,
       scrollY: 0,
-      windowWidth: page.scrollWidth,
-      height: page.scrollHeight,
-      width: page.offsetWidth,
+      windowWidth: pageW,
+      height: pageH,
+      width: pageW,
     });
 
-    // Restore
+    // Restore chrome
     if(bottomTabs) bottomTabs.style.display = prevBT;
     if(fab) fab.style.display = prevFab;
     if(topNav) topNav.style.display = prevNav;
 
-    canvas.toBlob(async (blob) => {
+    // Composite: bg gradient + page content
+    const out = document.createElement('canvas');
+    out.width = pageCanvas.width;
+    out.height = pageCanvas.height;
+    const oc = out.getContext('2d');
+    // Draw gradient background
+    const g = oc.createLinearGradient(0, 0, out.width, out.height);
+    g.addColorStop(0, '#FFF5F8');
+    g.addColorStop(0.45, '#FFF8F2');
+    g.addColorStop(1, '#F5FFF8');
+    oc.fillStyle = g;
+    oc.fillRect(0, 0, out.width, out.height);
+    // Draw page on top
+    oc.drawImage(pageCanvas, 0, 0);
+
+    out.toBlob(async (blob) => {
       const mo = document.getElementById('navMonth').textContent;
       const fileName = `家庭公費_${mo}.png`;
-      // Try Web Share API first (mobile)
       if(navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'image/png' })] })){
         const file = new File([blob], fileName, { type: 'image/png' });
         await navigator.share({ files: [file], title: `家庭公費 ${mo}` });
         showToast('🌸 已開啟分享！');
       } else {
-        // Fallback: download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = fileName; a.click();
