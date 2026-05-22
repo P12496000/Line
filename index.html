@@ -628,6 +628,7 @@
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
@@ -667,7 +668,7 @@
   <div class="nav-month" onclick="openMonthPicker()">
     <span id="navMonth">--</span> <span style="font-size:0.75rem;">▾</span>
   </div>
-  <div style="width:60px;"></div>
+  <button class="nav-pill" id="shareScreenBtn" onclick="shareHomeScreenshot()" style="gap:4px;">📸 分享</button>
 </div>
 
 <!-- ══ HOME ══ -->
@@ -2713,6 +2714,67 @@ function initLineToggle(){
   if(cb){ cb.checked = lineNotifyEnabled; }
   if(lbl){ lbl.textContent = lineNotifyEnabled ? '已開啟' : '已關閉'; }
   initLineGroupId();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SHARE HOME SCREENSHOT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function shareHomeScreenshot(){
+  const btn = document.getElementById('shareScreenBtn');
+  btn.textContent = '⏳ 截圖中...';
+  btn.disabled = true;
+  try {
+    // Temporarily hide UI chrome that shouldn't appear in screenshot
+    const bottomTabs = document.querySelector('.bottom-tabs');
+    const fab = document.getElementById('fab');
+    const topNav = document.querySelector('.top-nav');
+    const prevBT = bottomTabs ? bottomTabs.style.display : '';
+    const prevFab = fab ? fab.style.display : '';
+    const prevNav = topNav ? topNav.style.display : '';
+    if(bottomTabs) bottomTabs.style.display = 'none';
+    if(fab) fab.style.display = 'none';
+    if(topNav) topNav.style.display = 'none';
+
+    const page = document.getElementById('page-home');
+    const canvas = await html2canvas(page, {
+      backgroundColor: '#FFF5F8',
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      scrollY: 0,
+      windowWidth: page.scrollWidth,
+      height: page.scrollHeight,
+      width: page.offsetWidth,
+    });
+
+    // Restore
+    if(bottomTabs) bottomTabs.style.display = prevBT;
+    if(fab) fab.style.display = prevFab;
+    if(topNav) topNav.style.display = prevNav;
+
+    canvas.toBlob(async (blob) => {
+      const mo = document.getElementById('navMonth').textContent;
+      const fileName = `家庭公費_${mo}.png`;
+      // Try Web Share API first (mobile)
+      if(navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'image/png' })] })){
+        const file = new File([blob], fileName, { type: 'image/png' });
+        await navigator.share({ files: [file], title: `家庭公費 ${mo}` });
+        showToast('🌸 已開啟分享！');
+      } else {
+        // Fallback: download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = fileName; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        showToast('📥 截圖已下載！');
+      }
+    }, 'image/png');
+  } catch(e) {
+    showToast('😢 截圖失敗：' + e.message);
+  } finally {
+    btn.textContent = '📸 分享';
+    btn.disabled = false;
+  }
 }
 
 </script>
