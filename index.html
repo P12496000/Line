@@ -105,8 +105,8 @@
     width: 270px; height: 270px; transform: rotate(-90deg);
   }
   .donut-svg circle {
-    transition: stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1),
-                stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1);
+    transition: stroke-dasharray 2.2s cubic-bezier(0.4,0,0.2,1),
+                stroke-dashoffset 2.2s cubic-bezier(0.4,0,0.2,1);
   }
   .donut-center {
     position: absolute; text-align: center; pointer-events: none;
@@ -1974,8 +1974,8 @@ function refreshHome(){
     donutBal.setAttribute('stroke-dashoffset','0');
     requestAnimationFrame(()=>{
       requestAnimationFrame(()=>{
-        donutExp.style.transition='stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1)';
-        donutBal.style.transition='stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1)';
+        donutExp.style.transition='stroke-dasharray 2.2s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 2.2s cubic-bezier(0.4,0,0.2,1)';
+        donutBal.style.transition='stroke-dasharray 2.2s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 2.2s cubic-bezier(0.4,0,0.2,1)';
         if(totalBase<=0){ donutSvg.classList.add('ring-empty'); return; }
         donutExp.setAttribute('stroke-dasharray',`${ep} ${circ-ep}`);
         donutExp.setAttribute('stroke-dashoffset','0');
