@@ -742,10 +742,10 @@
   .member-row.status-paid.unpaid-row { opacity: 1; }
 
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
 </head>
 <body>
@@ -1443,14 +1443,14 @@ function setLoadBar(pct){
   const b = document.getElementById('loadBar');
   if(b) b.style.width = pct + '%';
 }
-// 最多等 1.5 秒，超時強制顯示主畫面（避免網路慢卡住）
+// 最多等 2 秒，超時強制顯示主畫面（避免網路慢卡住）
 setTimeout(()=>{
   if(!_loadingHidden){
     _loadingHidden = true;
     hideLoadingScreen();
     if(!_fbReady) showToast('⚠️ 網路較慢，顯示離線資料');
   }
-}, 1500);
+}, 2000);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  FIREBASE
@@ -1512,10 +1512,10 @@ function _doRefresh(){
       hideLoadingScreen();
       _doRefresh();
     } else {
-      // 無快取：動畫進度條，最多等 3 秒（超時由上方 setTimeout 處理）
-      setLoadBar(20);
-      setTimeout(()=>setLoadBar(45), 300);
-      setTimeout(()=>setLoadBar(70), 800);
+      // 無快取：動畫進度條，最多等 2 秒（超時由上方 setTimeout 處理）
+      setLoadBar(30);
+      setTimeout(()=>setLoadBar(55), 200);
+      setTimeout(()=>setLoadBar(80), 600);
     }
   } catch(e){}
 })();
