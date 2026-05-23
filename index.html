@@ -96,6 +96,17 @@
   .page { display: none; }
   .page.active { display: block; }
 
+  /* ── PAGE TRANSITIONS ── */
+  @keyframes slideInRight  { from { opacity:0; transform:translateX(48px) } to { opacity:1; transform:translateX(0) } }
+  @keyframes slideInLeft   { from { opacity:0; transform:translateX(-48px) } to { opacity:1; transform:translateX(0) } }
+  @keyframes slideOutRight { from { opacity:1; transform:translateX(0) } to { opacity:0; transform:translateX(48px) } }
+  @keyframes slideOutLeft  { from { opacity:1; transform:translateX(0) } to { opacity:0; transform:translateX(-48px) } }
+
+  .page.page-enter-right { display:block; animation: slideInRight  0.28s cubic-bezier(0.4,0,0.2,1) both; }
+  .page.page-enter-left  { display:block; animation: slideInLeft   0.28s cubic-bezier(0.4,0,0.2,1) both; }
+  .page.page-exit-right  { display:block; animation: slideOutRight 0.22s cubic-bezier(0.4,0,0.2,1) both; pointer-events:none; position:absolute; top:0; left:0; right:0; }
+  .page.page-exit-left   { display:block; animation: slideOutLeft  0.22s cubic-bezier(0.4,0,0.2,1) both; pointer-events:none; position:absolute; top:0; left:0; right:0; }
+
   /* ── DONUT ── */
   .donut-wrap {
     display: flex; justify-content: center; align-items: center;
@@ -105,8 +116,8 @@
     width: 270px; height: 270px; transform: rotate(-90deg);
   }
   .donut-svg circle {
-    transition: stroke-dasharray 2.2s cubic-bezier(0.4,0,0.2,1),
-                stroke-dashoffset 2.2s cubic-bezier(0.4,0,0.2,1);
+    transition: stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1),
+                stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1);
   }
   .donut-center {
     position: absolute; text-align: center; pointer-events: none;
@@ -775,6 +786,7 @@
   <button class="nav-pill" id="shareScreenBtn" onclick="shareHomeScreenshot()" style="gap:4px;">📸 分享</button>
 </div>
 
+<div id="pageWrap" style="position:relative;overflow-x:hidden;">
 <!-- ══ HOME ══ -->
 <div class="page active" id="page-home">
   <div class="donut-wrap">
@@ -929,6 +941,7 @@
     <div class="list-card" id="memList" style="margin:0;"></div>
   </div>
 </div>
+</div><!-- /pageWrap -->
 
 <!-- TABS -->
 <div class="bottom-tabs">
@@ -1974,8 +1987,8 @@ function refreshHome(){
     donutBal.setAttribute('stroke-dashoffset','0');
     requestAnimationFrame(()=>{
       requestAnimationFrame(()=>{
-        donutExp.style.transition='stroke-dasharray 2.2s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 2.2s cubic-bezier(0.4,0,0.2,1)';
-        donutBal.style.transition='stroke-dasharray 2.2s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 2.2s cubic-bezier(0.4,0,0.2,1)';
+        donutExp.style.transition='stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1)';
+        donutBal.style.transition='stroke-dasharray 1.1s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1)';
         if(totalBase<=0){ donutSvg.classList.add('ring-empty'); return; }
         donutExp.setAttribute('stroke-dasharray',`${ep} ${circ-ep}`);
         donutExp.setAttribute('stroke-dashoffset','0');
@@ -2213,16 +2226,43 @@ function pickMo(m){curMonth=m;updateNavMo();closeMonthPicker();refreshAll();}
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  NAV
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
+const PAGE_ORDER = ['home','ev','settings'];
 let curPage='home';
+let _pageTransitioning = false;
 function switchPage(p){
-  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  if(p === curPage || _pageTransitioning) return;
+  _pageTransitioning = true;
+
+  const fromIdx = PAGE_ORDER.indexOf(curPage);
+  const toIdx   = PAGE_ORDER.indexOf(p);
+  const goRight = toIdx > fromIdx; // new page comes from right
+
+  const fromEl = document.getElementById('page-' + curPage);
+  const toEl   = document.getElementById('page-' + p);
+
+  // Update tabs immediately
   document.querySelectorAll('.tab-item').forEach(el=>el.classList.remove('active'));
-  document.getElementById('page-'+p).classList.add('active');
-  const ti=document.getElementById('tab-'+p);if(ti)ti.classList.add('active');
-  curPage=p;
-  document.getElementById('fab').style.display=(p==='home')?'flex':'none';
-  if(p==='ev')refreshEv();
-  if(p==='settings')refreshSettings();
+  const ti = document.getElementById('tab-' + p); if(ti) ti.classList.add('active');
+  document.getElementById('fab').style.display = (p==='home') ? 'flex' : 'none';
+
+  // Exit animation on current page
+  fromEl.classList.remove('active');
+  fromEl.classList.add(goRight ? 'page-exit-left' : 'page-exit-right');
+
+  // Enter animation on new page
+  toEl.classList.add(goRight ? 'page-enter-right' : 'page-enter-left');
+
+  // After enter animation finishes, clean up
+  toEl.addEventListener('animationend', function onEnd(){
+    toEl.removeEventListener('animationend', onEnd);
+    fromEl.classList.remove('page-exit-left','page-exit-right');
+    toEl.classList.remove('page-enter-right','page-enter-left');
+    toEl.classList.add('active');
+    curPage = p;
+    _pageTransitioning = false;
+    if(p==='ev') refreshEv();
+    if(p==='settings') refreshSettings();
+  }, {once: true});
 }
 function openAdd(){
   numStr='0';numExpr='';
