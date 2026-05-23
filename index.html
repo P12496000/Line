@@ -886,7 +886,7 @@
           </div>
         </div>
         <label class="line-toggle-wrap">
-          <input type="checkbox" id="lineToggle" onchange="toggleLineNotify(this.checked)" checked>
+          <input type="checkbox" id="lineToggle" onchange="toggleLineNotify(this.checked)">
           <span class="line-toggle-slider"></span>
         </label>
       </div>
@@ -1490,8 +1490,9 @@ function _tryHideLoading(){
 function _doRefresh(){
   if(document.readyState === 'complete' || document.readyState === 'interactive'){
     refreshAll();
+    initLineToggle();
   } else {
-    document.addEventListener('DOMContentLoaded', refreshAll);
+    document.addEventListener('DOMContentLoaded', ()=>{ refreshAll(); initLineToggle(); });
   }
 }
 
@@ -2975,6 +2976,13 @@ function incomeAnimation(){
 // LINE notify toggle (persisted in localStorage)
 let lineNotifyEnabled = localStorage.getItem('lineNotifyEnabled') !== 'false';
 
+// Run initLineToggle as soon as DOM is ready (independent of Firebase)
+if(document.readyState === 'complete' || document.readyState === 'interactive'){
+  initLineToggle();
+} else {
+  document.addEventListener('DOMContentLoaded', initLineToggle);
+}
+
 // Animation duration (seconds, 1-6, persisted)
 let animDurSecs = parseInt(localStorage.getItem('animDurSecs') || '3');
 
@@ -2996,7 +3004,22 @@ function toggleLineNotify(enabled){
   localStorage.setItem('lineNotifyEnabled', enabled ? 'true' : 'false');
   const lbl = document.getElementById('lineToggleLabel');
   if(lbl) lbl.textContent = enabled ? '已開啟' : '已關閉';
+  _syncLineSettingsUI(enabled);
   showToast(enabled ? '🔔 LINE 通知已開啟' : '🔕 LINE 通知已關閉');
+}
+
+function _syncLineSettingsUI(enabled){
+  // Dim the group-ID section when notifications are off
+  const groupSection = document.getElementById('lineGroupIdInput');
+  const saveBtn = groupSection && groupSection.parentNode && groupSection.parentNode.querySelector('button');
+  if(groupSection){
+    groupSection.disabled = !enabled;
+    groupSection.style.opacity = enabled ? '1' : '0.45';
+  }
+  if(saveBtn){
+    saveBtn.disabled = !enabled;
+    saveBtn.style.opacity = enabled ? '1' : '0.45';
+  }
 }
 
 function initLineToggle(){
@@ -3004,6 +3027,7 @@ function initLineToggle(){
   const lbl = document.getElementById('lineToggleLabel');
   if(cb){ cb.checked = lineNotifyEnabled; }
   if(lbl){ lbl.textContent = lineNotifyEnabled ? '已開啟' : '已關閉'; }
+  _syncLineSettingsUI(lineNotifyEnabled);
   initLineGroupId();
 }
 
