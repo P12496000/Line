@@ -1585,16 +1585,6 @@ function setLoadBar(pct){
   const b = document.getElementById('loadBar');
   if(b) b.style.width = pct + '%';
 }
-// 最多等 3 秒，超時強制顯示主畫面
-setTimeout(()=>{
-  _loadingHidden = true;
-  hideLoadingScreen();
-  if(!_fbReady){
-    showToast('⚠️ 網路較慢，顯示離線資料');
-    _doRefresh();
-  }
-}, 3000);
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  FIREBASE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1625,6 +1615,17 @@ let _fbReady = false;
 let _evReady = false;
 let _loadingHidden = false;
 let _firstRenderDone = false;
+
+// 最多等 3 秒，超時強制顯示主畫面（變數已宣告好，可安全使用）
+setTimeout(function(){
+  if(_loadingHidden) return;
+  _loadingHidden = true;
+  hideLoadingScreen();
+  if(!_fbReady){
+    if(typeof showToast === 'function') showToast('⚠️ 網路較慢，顯示離線資料');
+    if(typeof _doRefresh === 'function') _doRefresh();
+  }
+}, 3000);
 
 function _tryHideLoading(){
   if(_loadingHidden) return;
@@ -2445,22 +2446,13 @@ function testFirebaseWrite(){
     testRef.once('value').then(function(snap){
       var v = snap.val();
       if(v && v.t === val){
-        alert('✅ Firebase 讀寫成功！
-
-房間 ID：' + ROOM + '
-寫入時間：' + new Date(val).toLocaleTimeString() + '
-
-如果另一台設備也顯示同樣的房間 ID，資料就會同步。
-
-⚠️ 如果主頁資料還是不同，請兩台都按「測試同步」，確認顯示的房間 ID 完全一致。');
+        alert('✅ Firebase 讀寫成功！\n\n房間 ID：' + ROOM + '\n寫入時間：' + new Date(val).toLocaleTimeString() + '\n\n如果另一台設備也顯示同樣的房間 ID，資料就會同步。');
       } else {
         alert('⚠️ 資料不符，請重試');
       }
     });
   }).catch(function(err){
-    alert('❌ 寫入失敗：' + err.message + '
-
-Firebase 安全規則未開放，請到 Firebase Console 改規則。');
+    alert('❌ 寫入失敗：' + err.message + '\n\nFirebase 安全規則未開放，請到 Firebase Console 改規則。');
   });
 }
 
