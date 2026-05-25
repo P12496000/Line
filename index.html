@@ -978,7 +978,7 @@
           <div class="item-icon plain" style="background:#e8f8ee;border-color:#06C755;">📨</div>
           <div>
             <div class="item-name">LINE 通知</div>
-            <div class="item-date" id="lineToggleLabel">已開啟</div>
+            <div class="item-date" id="lineToggleLabel">已關閉</div>
           </div>
         </div>
         <label class="line-toggle-wrap">
@@ -3213,14 +3213,14 @@ function incomeAnimation(){
   if(img.complete) requestAnimationFrame(tick);
 }
 
-// LINE notify toggle (persisted in localStorage) — 預設開啟
+// LINE notify toggle (persisted in localStorage) — 預設關閉（跨設備同步需手動開啟）
 const _DEFAULT_LINE_GROUP_ID = 'C6968ec8b65659553d0f6786f7d7e5a16';
 // 若從未設定過群組 ID，預填預設值
 if(!localStorage.getItem('lineGroupId')){
   localStorage.setItem('lineGroupId', _DEFAULT_LINE_GROUP_ID);
 }
-// lineNotifyEnabled 預設 true（只有明確設為 'false' 才關閉）
-let lineNotifyEnabled = localStorage.getItem('lineNotifyEnabled') !== 'false';
+// lineNotifyEnabled 預設 false（只有明確設為 'true' 才開啟）
+let lineNotifyEnabled = localStorage.getItem('lineNotifyEnabled') === 'true';
 
 // Run initLineToggle as soon as DOM is ready (independent of Firebase)
 if(document.readyState === 'complete' || document.readyState === 'interactive'){
