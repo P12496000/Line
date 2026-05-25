@@ -1585,14 +1585,15 @@ function setLoadBar(pct){
   const b = document.getElementById('loadBar');
   if(b) b.style.width = pct + '%';
 }
-// 最多等 2 秒，超時強制顯示主畫面（避免網路慢卡住）
+// 最多等 3 秒，超時強制顯示主畫面
 setTimeout(()=>{
-  if(!_loadingHidden){
-    _loadingHidden = true;
-    hideLoadingScreen();
-    if(!_fbReady) showToast('⚠️ 網路較慢，顯示離線資料');
+  _loadingHidden = true;
+  hideLoadingScreen();
+  if(!_fbReady){
+    showToast('⚠️ 網路較慢，顯示離線資料');
+    _doRefresh();
   }
-}, 2000);
+}, 3000);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  FIREBASE
@@ -1644,26 +1645,25 @@ function _doRefresh(){
 }
 
 // ── Pre-load from localStorage for instant first paint ──
+// 用 ROOM 當 key（和 Firebase listener 一致）
 (function(){
   try {
-    const cacheKey = 'fb_cache_' + (location.hash.replace('#','') || 'default');
-    const evKey    = 'fb_ev_cache_' + (location.hash.replace('#','') || 'default');
-    const raw = localStorage.getItem(cacheKey);
-    const rawEv = localStorage.getItem(evKey);
+    const raw   = localStorage.getItem('fb_cache_' + ROOM);
+    const rawEv = localStorage.getItem('fb_ev_cache_' + ROOM);
+    const rawCar= localStorage.getItem('fb_car_' + ROOM);
     if(raw){
-      _cache = JSON.parse(raw);
-      _evCache = rawEv ? JSON.parse(rawEv) : [];
+      _cache   = JSON.parse(raw);
+      _evCache = rawEv  ? JSON.parse(rawEv)  : [];
+      _carCache= rawCar ? JSON.parse(rawCar) : {info:{},loan:{},maintenance:[],loanPayments:{}};
       _fbReady = true;
       _evReady = true;
       _loadingHidden = true;
-      // 有快取：立刻顯示主畫面，不等 Firebase
       hideLoadingScreen();
       _doRefresh();
     } else {
-      // 無快取：動畫進度條，最多等 2 秒（超時由上方 setTimeout 處理）
       setLoadBar(30);
-      setTimeout(()=>setLoadBar(55), 200);
-      setTimeout(()=>setLoadBar(80), 600);
+      setTimeout(()=>setLoadBar(60), 300);
+      setTimeout(()=>setLoadBar(85), 800);
     }
   } catch(e){}
 })();
@@ -1672,42 +1672,13 @@ function _doRefresh(){
 FB_REF.on('value', snap => {
   _cache = snap.val() || {members:[],entries:{},defaultAmt:1500};
   _fbReady = true;
-  try {
-    const cacheKey = 'fb_cache_' + ROOM;
-    localStorage.setItem(cacheKey, JSON.stringify(_cache));
-  } catch(e){}
+  try { localStorage.setItem('fb_cache_'+ROOM, JSON.stringify(_cache)); } catch(e){}
   _tryHideLoading();
   _doRefresh();
 }, err => {
   hideLoadingScreen();
-  showToast('Firebase錯誤：' + err.code);
+  showToast('Firebase 連線錯誤：' + err.code);
 });
-
-// 主動驗證：啟動後 2 秒從 Firebase 強制拉一次最新資料（繞過 localStorage 快取）
-setTimeout(function(){
-  FB_REF.once('value').then(function(snap){
-    var v = snap.val();
-    if(v){
-      _cache = v;
-      try { localStorage.setItem('fb_cache_'+ROOM, JSON.stringify(v)); } catch(e){}
-      _doRefresh();
-    }
-  });
-  // 同時拉 car 資料
-  FB_CAR_REF.once('value').then(function(snap){
-    var v = snap.val();
-    if(v){
-      _carCache = {
-        info: v.info || {},
-        loan: v.loan || {},
-        maintenance: v.maintenance ? (Array.isArray(v.maintenance) ? v.maintenance : Object.values(v.maintenance)) : [],
-        loanPayments: v.loanPayments || {}
-      };
-      try { localStorage.setItem('fb_car_'+ROOM, JSON.stringify(_carCache)); } catch(e){}
-      if(typeof refreshCar === 'function') refreshCar();
-    }
-  });
-}, 2000);
 FB_EV_REF.on('value', snap => {
   _evCache = snap.val() || [];
   _evReady = true;
