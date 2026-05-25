@@ -1062,7 +1062,8 @@
         <div id="fbStatusText" style="font-size:0.78rem;color:var(--soft);">連線檢查中...</div>
       </div>
       <div style="font-size:0.75rem;color:var(--soft);margin-bottom:4px;">目前房間 ID</div>
-      <div id="roomIdDisplay" style="font-family:'Fredoka One';font-size:1.1rem;color:var(--pink);margin-bottom:12px;padding:8px 12px;background:var(--pink-pale);border-radius:12px;border:2px solid var(--pink);text-align:center;letter-spacing:1px;"></div>
+      <div id="roomIdDisplay" style="font-family:'Fredoka One';font-size:1.1rem;color:var(--pink);margin-bottom:4px;padding:8px 12px;background:var(--pink-pale);border-radius:12px;border:2px solid var(--pink);text-align:center;letter-spacing:1px;"></div>
+      <div style="font-size:0.7rem;color:var(--soft);margin-bottom:12px;">Firebase 路徑：<span id="fbPathDisplay" style="color:#888;font-family:monospace;"></span></div>
       <div style="font-size:0.75rem;color:var(--soft);margin-bottom:8px;line-height:1.5;">所有設備開同一個網址就會自動同步。把連結傳給家人 👇</div>
       <div class="share-box" id="shareBox" style="font-size:0.72rem;word-break:break-all;margin-bottom:10px;"></div>
       <div style="display:flex;gap:8px;">
@@ -1681,6 +1682,32 @@ FB_REF.on('value', snap => {
   hideLoadingScreen();
   showToast('Firebase錯誤：' + err.code);
 });
+
+// 主動驗證：啟動後 2 秒從 Firebase 強制拉一次最新資料（繞過 localStorage 快取）
+setTimeout(function(){
+  FB_REF.once('value').then(function(snap){
+    var v = snap.val();
+    if(v){
+      _cache = v;
+      try { localStorage.setItem('fb_cache_'+ROOM, JSON.stringify(v)); } catch(e){}
+      _doRefresh();
+    }
+  });
+  // 同時拉 car 資料
+  FB_CAR_REF.once('value').then(function(snap){
+    var v = snap.val();
+    if(v){
+      _carCache = {
+        info: v.info || {},
+        loan: v.loan || {},
+        maintenance: v.maintenance ? (Array.isArray(v.maintenance) ? v.maintenance : Object.values(v.maintenance)) : [],
+        loanPayments: v.loanPayments || {}
+      };
+      try { localStorage.setItem('fb_car_'+ROOM, JSON.stringify(_carCache)); } catch(e){}
+      if(typeof refreshCar === 'function') refreshCar();
+    }
+  });
+}, 2000);
 FB_EV_REF.on('value', snap => {
   _evCache = snap.val() || [];
   _evReady = true;
@@ -2326,6 +2353,8 @@ function refreshSettings(){
   var url=location.href.split('#')[0]+'#'+ROOM;
   if(sb) sb.textContent=url;
   if(rid) rid.textContent=ROOM;
+  var fp=document.getElementById('fbPathDisplay');
+  if(fp) fp.textContent='rooms/'+ROOM;
   document.getElementById('memList').innerHTML=!d.members.length
     ?'<div class="empty" style="padding:16px;"><p>還沒有成員，請新增</p></div>'
     :d.members.map((m,i)=>{
@@ -2438,20 +2467,29 @@ function switchToNowAndAdd(){
 function closeAdd(){document.getElementById('addModal').classList.remove('show');}
 document.getElementById('addModal').addEventListener('click',e=>{if(e.target.id==='addModal')closeAdd();});
 function testFirebaseWrite(){
-  var testRef = db.ref('rooms/' + ROOM + '/__synctest__');
+  var testRef = db.ref('__ping__/' + ROOM);
   var val = Date.now();
-  testRef.set(val).then(function(){
-    // Now read it back
+  showToast('⏳ 寫入測試中...');
+  testRef.set({t: val, from: navigator.userAgent.substring(0,40)}).then(function(){
     testRef.once('value').then(function(snap){
-      if(snap.val() === val){
-        showToast('✅ Firebase 讀寫正常！房間：' + ROOM);
+      var v = snap.val();
+      if(v && v.t === val){
+        alert('✅ Firebase 讀寫成功！
+
+房間 ID：' + ROOM + '
+寫入時間：' + new Date(val).toLocaleTimeString() + '
+
+如果另一台設備也顯示同樣的房間 ID，資料就會同步。
+
+⚠️ 如果主頁資料還是不同，請兩台都按「測試同步」，確認顯示的房間 ID 完全一致。');
       } else {
-        showToast('⚠️ 寫入成功但讀取不符，請重試');
+        alert('⚠️ 資料不符，請重試');
       }
-      testRef.remove();
     });
   }).catch(function(err){
-    showToast('❌ Firebase 寫入失敗：' + err.message);
+    alert('❌ 寫入失敗：' + err.message + '
+
+Firebase 安全規則未開放，請到 Firebase Console 改規則。');
   });
 }
 
