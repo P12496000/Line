@@ -3373,6 +3373,7 @@ function refreshCar(){
   if((el=document.getElementById('loanStartDate')))el.value=loan.startDate||'';
   if((el=document.getElementById('loanTermMonths')))el.value=loan.termMonths||'';
   renderCarAge(d); renderLoanProgress(d); renderMaintenanceList(d);
+  updateLoanPayUI();
 }
 
 function renderCarAge(d){
@@ -3608,13 +3609,6 @@ async function checkLoanPaymentAlert(){
     '⚠️ ' + monthStr + ' 月份貸款尚未確認繳費！\n月繳金額：$' + Number(loan.monthly).toLocaleString() + '\n請記得確認繳費 🙏',
     'urgent'
   );
-}
-
-// Hook into refreshCar so loan pay UI always updates
-var _origRefreshCar = refreshCar;
-function refreshCar(){
-  _origRefreshCar();
-  updateLoanPayUI();
 }
 
 // Init ntfy UI after DOM ready
