@@ -3469,6 +3469,47 @@ function renderLoanProgress() {
     </div>`;
 }
 
+function renderMaintenanceList() {
+  const d = getCarData();
+  const records = [...d.maintenance].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const el = document.getElementById('maintList');
+  if (!el) return;
+  if (!records.length) {
+    el.innerHTML = '<div class="empty"><span class="ee">🔧</span><p>還沒有保養記錄</p></div>';
+    return;
+  }
+  const totalCost = records.reduce((s, r) => s + (r.cost || 0), 0);
+  const tagIcons = {'機油更換':'🛢️','輪胎更換':'🔄','煞車保養':'🛑','空調清洗':'❄️','大保養':'⚙️','電池檢查':'🔋','其他':'📋'};
+  el.innerHTML =
+    `<div style="padding:10px 14px 4px;display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid var(--pink-pale);">
+      <span style="font-size:0.78rem;color:var(--soft);">共 ${records.length} 筆記錄</span>
+      <span style="font-family:'Fredoka One';font-size:0.9rem;color:var(--exp);">累計費用 $${totalCost.toLocaleString()}</span>
+    </div>` +
+    records.map(r => {
+      const tagStr = (r.types || []).map(t => {
+        const ico = tagIcons[t] || '🔧';
+        return `<span style="background:#f5e8ff;border:1px solid #d0a0ff;border-radius:20px;padding:2px 8px;font-size:0.7rem;color:#7040a0;">${ico} ${t}</span>`;
+      }).join(' ');
+      return `
+        <div class="list-item" style="flex-direction:column;align-items:stretch;gap:6px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="item-icon lav">🔧</div>
+              <div>
+                <div style="font-weight:700;font-size:0.9rem;">${r.date}</div>
+                <div style="font-size:0.72rem;color:var(--soft);">${r.mileage ? r.mileage.toLocaleString() + ' km' : '—'}</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="font-family:'Fredoka One';font-size:1.1rem;color:var(--exp);">$${(r.cost || 0).toLocaleString()}</div>
+              <button class="item-del" onclick="delMaintenanceRecord(${r.id})">✕</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;">${tagStr}</div>
+          ${r.note ? `<div style="font-size:0.78rem;color:var(--soft);padding-left:2px;">📝 ${r.note}</div>` : ''}
+        </div>`;
+    }).join('');
+}
 
 </script>
 </body>
