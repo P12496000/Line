@@ -1057,15 +1057,18 @@
   <div style="padding:14px 16px 4px"><div class="section-title" style="padding:0">🔗 跨設備同步</div></div>
   <div style="padding:0 16px 16px">
     <div class="list-card" style="margin:0;padding:16px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
         <div id="fbStatusDot" style="width:10px;height:10px;border-radius:50%;background:#ccc;flex-shrink:0;"></div>
         <div id="fbStatusText" style="font-size:0.78rem;color:var(--soft);">連線檢查中...</div>
       </div>
-      <div style="font-size:0.78rem;color:var(--soft);margin-bottom:10px;line-height:1.6;">
-        把下方連結傳給家人，開啟同一個網址就會自動同步所有資料 🌸
+      <div style="font-size:0.75rem;color:var(--soft);margin-bottom:4px;">目前房間 ID</div>
+      <div id="roomIdDisplay" style="font-family:'Fredoka One';font-size:1.1rem;color:var(--pink);margin-bottom:12px;padding:8px 12px;background:var(--pink-pale);border-radius:12px;border:2px solid var(--pink);text-align:center;letter-spacing:1px;"></div>
+      <div style="font-size:0.75rem;color:var(--soft);margin-bottom:8px;line-height:1.5;">所有設備開同一個網址就會自動同步。把連結傳給家人 👇</div>
+      <div class="share-box" id="shareBox" style="font-size:0.72rem;word-break:break-all;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="action-btn btn-mint" onclick="copyShare()" style="margin:0;flex:1;">📤 複製連結</button>
+        <button class="action-btn" onclick="testFirebaseWrite()" style="margin:0;flex:1;background:#e8f8ee;color:#22aa66;border-color:#22aa66;box-shadow:2px 2px 0 #22aa66;">🧪 測試同步</button>
       </div>
-      <div class="share-box" id="shareBox" style="font-size:0.78rem;word-break:break-all;margin-bottom:10px;"></div>
-      <button class="action-btn btn-mint" onclick="copyShare()" style="margin-bottom:0;">📤 複製連結給家人</button>
     </div>
   </div>
   <div style="padding:0 16px 4px"><div class="section-title" style="padding:0">👥 固定成員管理</div></div>
@@ -2316,9 +2319,13 @@ function refreshStats(){
 function refreshSettings(){
   initLineToggle();
   initAnimDur();
+  initNtfyUI();
   const d=getData();
   var sb=document.getElementById('shareBox');
-  if(sb) sb.textContent=location.href.split('#')[0]+'#'+ROOM;
+  var rid=document.getElementById('roomIdDisplay');
+  var url=location.href.split('#')[0]+'#'+ROOM;
+  if(sb) sb.textContent=url;
+  if(rid) rid.textContent=ROOM;
   document.getElementById('memList').innerHTML=!d.members.length
     ?'<div class="empty" style="padding:16px;"><p>還沒有成員，請新增</p></div>'
     :d.members.map((m,i)=>{
@@ -2430,6 +2437,24 @@ function switchToNowAndAdd(){
 }
 function closeAdd(){document.getElementById('addModal').classList.remove('show');}
 document.getElementById('addModal').addEventListener('click',e=>{if(e.target.id==='addModal')closeAdd();});
+function testFirebaseWrite(){
+  var testRef = db.ref('rooms/' + ROOM + '/__synctest__');
+  var val = Date.now();
+  testRef.set(val).then(function(){
+    // Now read it back
+    testRef.once('value').then(function(snap){
+      if(snap.val() === val){
+        showToast('✅ Firebase 讀寫正常！房間：' + ROOM);
+      } else {
+        showToast('⚠️ 寫入成功但讀取不符，請重試');
+      }
+      testRef.remove();
+    });
+  }).catch(function(err){
+    showToast('❌ Firebase 寫入失敗：' + err.message);
+  });
+}
+
 function setRoomName(){
   var input = document.getElementById('roomNameInput');
   var name = (input.value||'').trim().replace(/[^a-zA-Z0-9_一-鿿-]/g,'-').toLowerCase();
