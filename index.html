@@ -1557,6 +1557,7 @@ const ROOM=getRoomId();
 const FB_REF = db.ref('rooms/' + ROOM);
 const FB_EV_REF = db.ref('ev/' + ROOM);
 const FB_CAR_REF = db.ref('car/' + ROOM);
+var _carCache = {info:{},loan:{},maintenance:[]};
 
 // In-memory cache
 let _cache = {members:[],entries:{},defaultAmt:1500};
@@ -3212,8 +3213,7 @@ async function shareHomeScreenshot(){
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  CAR MANAGEMENT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
-var _carCache = {info:{},loan:{},maintenance:[]};
-
+// _carCache declared and initialized near FB_CAR_REF above
 function initCarFirebase(){ /* already initialized at startup */ }
 
 function getCarData(){
