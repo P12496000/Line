@@ -955,6 +955,15 @@
     <div style="background:rgba(255,255,255,0.92);border:var(--border);border-radius:22px;padding:16px 18px;box-shadow:4px 4px 0 #3A2A3A;">
       <div style="font-family:'Fredoka One';font-size:0.85rem;color:var(--text);margin-bottom:10px;">&#128179; 貸款繳費進度</div>
       <div id="loanProgressContent"><div style="font-size:0.82rem;color:var(--soft);text-align:center;padding:12px 0;">請先設定貸款資訊 &#128070;</div></div>
+      <!-- Monthly payment confirmation -->
+      <div id="loanPayConfirmWrap" style="display:none;margin-top:14px;border-top:2px solid var(--pink-pale);padding-top:12px;">
+        <div style="font-family:'Fredoka One';font-size:0.82rem;color:var(--text);margin-bottom:8px;">✅ 本月繳費確認</div>
+        <div id="loanPayStatusMsg" style="font-size:0.78rem;color:var(--soft);margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;">
+          <button id="loanPayConfirmBtn" onclick="confirmLoanPayment()" class="action-btn btn-mint" style="margin-bottom:0;flex:1;">✅ 確認本月已繳費</button>
+          <button id="loanPayUndoBtn" onclick="undoLoanPayment()" class="action-btn" style="margin-bottom:0;flex:1;background:#fff0f5;color:var(--exp);border-color:#ffb0c0;box-shadow:2px 2px 0 #ffb0c0;display:none;">↩ 取消繳費</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -994,6 +1003,38 @@
       </div>
     </div>
   </div>
+  <!-- ══ NTFY SETTINGS ══ -->
+  <div style="padding:8px 16px 4px;">
+    <div class="list-card" style="margin:0;">
+      <div class="list-item" style="justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="item-icon plain" style="background:#e8f0ff;border-color:#6b8cff;">🔔</div>
+          <div>
+            <div class="item-name">ntfy 推播通知</div>
+            <div class="item-date" id="ntfyToggleLabel">已關閉</div>
+          </div>
+        </div>
+        <label class="line-toggle-wrap">
+          <input type="checkbox" id="ntfyToggle" onchange="toggleNtfy(this.checked)">
+          <span class="line-toggle-slider"></span>
+        </label>
+      </div>
+      <div style="padding:12px 15px 14px;border-top:2px solid var(--pink-pale);">
+        <div style="font-size:0.73rem;color:var(--soft);margin-bottom:10px;line-height:1.5;">
+          每月 25 號自動檢查貸款是否已繳費，未繳時發送 ntfy 通知。
+        </div>
+        <div class="field-label">ntfy Server URL</div>
+        <input id="ntfyServer" class="field-input" style="margin-bottom:10px;" placeholder="https://ntfy.sh" value="https://ntfy.sh">
+        <div class="field-label">ntfy Topic（主題名稱）</div>
+        <div style="display:flex;gap:8px;">
+          <input id="ntfyTopic" class="field-input" style="margin-bottom:0;flex:1;" placeholder="my-loan-alert" maxlength="80">
+          <button onclick="saveNtfySettings()" class="add-member-btn">💾 儲存</button>
+        </div>
+        <button onclick="testNtfy()" class="action-btn" style="background:#e8f0ff;color:#3a5fcf;border-color:#6b8cff;box-shadow:2px 2px 0 #3a5fcf;margin-top:10px;margin-bottom:0;">📨 測試發送</button>
+      </div>
+    </div>
+  </div>
+
   <div style="padding:8px 16px 8px;">
     <div class="list-card" style="margin:0;">
       <div class="list-item" style="justify-content:space-between;align-items:center;">
@@ -3377,6 +3418,178 @@ function renderLoanProgress(d){
     '</div>'+
     '<div style="margin-top:10px;font-size:0.75rem;color:var(--soft);text-align:center;">🗓️ 預計還款完成：'+endStr+'　｜　每月 $'+l.monthly.toLocaleString()+'</div>';
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  NTFY PUSH NOTIFICATION
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+var _ntfyEnabled = localStorage.getItem('ntfyEnabled') === 'true';
+var _ntfyServer  = localStorage.getItem('ntfyServer')  || 'https://ntfy.sh';
+var _ntfyTopic   = localStorage.getItem('ntfyTopic')   || '';
+
+function initNtfyUI(){
+  var cb = document.getElementById('ntfyToggle');
+  var lbl = document.getElementById('ntfyToggleLabel');
+  var srv = document.getElementById('ntfyServer');
+  var top = document.getElementById('ntfyTopic');
+  if(cb)  cb.checked = _ntfyEnabled;
+  if(lbl) lbl.textContent = _ntfyEnabled ? '已開啟' : '已關閉';
+  if(srv) srv.value = _ntfyServer;
+  if(top) top.value = _ntfyTopic;
+}
+
+function toggleNtfy(enabled){
+  _ntfyEnabled = enabled;
+  localStorage.setItem('ntfyEnabled', enabled ? 'true' : 'false');
+  var lbl = document.getElementById('ntfyToggleLabel');
+  if(lbl) lbl.textContent = enabled ? '已開啟' : '已關閉';
+  showToast(enabled ? '🔔 ntfy 通知已開啟' : '🔕 ntfy 通知已關閉');
+}
+
+function saveNtfySettings(){
+  var srv = (document.getElementById('ntfyServer').value||'').trim() || 'https://ntfy.sh';
+  var top = (document.getElementById('ntfyTopic').value||'').trim();
+  if(!top){ showToast('請輸入 ntfy Topic 🥺'); return; }
+  _ntfyServer = srv;
+  _ntfyTopic  = top;
+  localStorage.setItem('ntfyServer', srv);
+  localStorage.setItem('ntfyTopic',  top);
+  showToast('💾 ntfy 設定已儲存！');
+}
+
+async function sendNtfy(title, message, priority){
+  if(!_ntfyEnabled) return;
+  if(!_ntfyTopic)   return;
+  try {
+    var url = _ntfyServer.replace(/\/+$/, '') + '/' + _ntfyTopic;
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Title': title,
+        'Priority': priority || 'high',
+        'Tags': 'money_with_wings',
+        'Content-Type': 'text/plain; charset=utf-8'
+      },
+      body: message
+    });
+  } catch(e) {
+    console.warn('ntfy send failed:', e);
+  }
+}
+
+async function testNtfy(){
+  var srv = (document.getElementById('ntfyServer').value||'').trim() || 'https://ntfy.sh';
+  var top = (document.getElementById('ntfyTopic').value||'').trim();
+  if(!top){ showToast('請先輸入 Topic 🥺'); return; }
+  try {
+    var url = srv.replace(/\/+$/, '') + '/' + top;
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Title': '🏠 家庭公費管家 測試通知',
+        'Priority': 'default',
+        'Tags': 'white_check_mark',
+        'Content-Type': 'text/plain; charset=utf-8'
+      },
+      body: 'ntfy 設定成功！貸款繳費提醒已就緒 🎉'
+    });
+    showToast('📨 測試通知已發送！');
+  } catch(e) {
+    showToast('❌ 發送失敗：' + e.message);
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  LOAN MONTHLY PAYMENT TRACKING
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+function _loanPayKey(){
+  var now = new Date();
+  return 'loanPay_' + ROOM + '_' + now.getFullYear() + '_' + String(now.getMonth()+1).padStart(2,'0');
+}
+
+function getLoanPayStatus(){
+  return localStorage.getItem(_loanPayKey()) === 'paid';
+}
+
+function confirmLoanPayment(){
+  localStorage.setItem(_loanPayKey(), 'paid');
+  updateLoanPayUI();
+  showToast('✅ 已確認本月貸款已繳費！');
+}
+
+function undoLoanPayment(){
+  localStorage.removeItem(_loanPayKey());
+  updateLoanPayUI();
+  showToast('↩ 已取消本月繳費確認');
+}
+
+function updateLoanPayUI(){
+  var wrap    = document.getElementById('loanPayConfirmWrap');
+  var msg     = document.getElementById('loanPayStatusMsg');
+  var btn     = document.getElementById('loanPayConfirmBtn');
+  var undoBtn = document.getElementById('loanPayUndoBtn');
+  if(!wrap) return;
+
+  var d = getCarData(), loan = d.loan || {};
+  if(!loan.total || !loan.monthly || !loan.startDate || !loan.termMonths){
+    wrap.style.display = 'none'; return;
+  }
+  wrap.style.display = 'block';
+
+  var now = new Date();
+  var monthStr = now.getFullYear() + ' 年 ' + (now.getMonth()+1) + ' 月';
+  var isPaid = getLoanPayStatus();
+  var today  = now.getDate();
+
+  if(isPaid){
+    msg.innerHTML = '<span style="color:#22aa66;">✅ ' + monthStr + '　已確認繳費</span>';
+    btn.style.display    = 'none';
+    undoBtn.style.display = 'block';
+  } else {
+    if(today >= 25){
+      msg.innerHTML = '<span style="color:var(--exp);">⚠️ ' + monthStr + '　今日為 ' + today + ' 號，尚未確認繳費！</span>';
+    } else {
+      msg.innerHTML = '<span style="color:var(--soft);">' + monthStr + '　尚未確認繳費（繳費日：每月 25 號）</span>';
+    }
+    btn.style.display    = 'block';
+    undoBtn.style.display = 'none';
+  }
+}
+
+// Check on app load: if today >= 25 and not paid, send ntfy alert
+async function checkLoanPaymentAlert(){
+  var d = getCarData(), loan = d.loan || {};
+  if(!loan.total || !loan.monthly) return;
+  var now = new Date();
+  if(now.getDate() < 25) return;
+  if(getLoanPayStatus()) return;
+  var monthStr = now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0');
+  await sendNtfy(
+    '💳 貸款繳費提醒',
+    '⚠️ ' + monthStr + ' 月份貸款尚未確認繳費！\n月繳金額：$' + Number(loan.monthly).toLocaleString() + '\n請記得確認繳費 🙏',
+    'urgent'
+  );
+}
+
+// Hook into refreshCar so loan pay UI always updates
+var _origRefreshCar = refreshCar;
+function refreshCar(){
+  _origRefreshCar();
+  updateLoanPayUI();
+}
+
+// Init ntfy UI after DOM ready
+(function(){
+  function doNtfyInit(){
+    initNtfyUI();
+    // Run payment alert check once Firebase/car data is loaded
+    setTimeout(checkLoanPaymentAlert, 3000);
+  }
+  if(document.readyState === 'complete' || document.readyState === 'interactive'){
+    doNtfyInit();
+  } else {
+    document.addEventListener('DOMContentLoaded', doNtfyInit);
+  }
+})();
 
 function renderMaintenanceList(d){
   var records=d.maintenance.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
