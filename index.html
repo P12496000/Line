@@ -1556,6 +1556,7 @@ function getRoomId(){
 const ROOM=getRoomId();
 const FB_REF = db.ref('rooms/' + ROOM);
 const FB_EV_REF = db.ref('ev/' + ROOM);
+const FB_CAR_REF = db.ref('car/' + ROOM);
 
 // In-memory cache
 let _cache = {members:[],entries:{},defaultAmt:1500};
@@ -1575,7 +1576,6 @@ function _tryHideLoading(){
 }
 
 function _doRefresh(){
-  if(typeof FB_CAR_REF === 'undefined' || !FB_CAR_REF) initCarFirebase();
   if(document.readyState === 'complete' || document.readyState === 'interactive'){
     refreshAll();
     initLineToggle();
@@ -1634,6 +1634,19 @@ FB_EV_REF.on('value', snap => {
 }, err => {
   showToast('EV錯誤：' + err.code);
 });
+FB_CAR_REF.on('value', function(snap){
+  var v = snap.val() || {};
+  _carCache = {
+    info: v.info || {},
+    loan: v.loan || {},
+    maintenance: v.maintenance ? (Array.isArray(v.maintenance) ? v.maintenance : Object.values(v.maintenance)) : []
+  };
+  try { localStorage.setItem('fb_car_'+ROOM, JSON.stringify(_carCache)); } catch(e){}
+  if(curPage==='car') refreshCar();
+});
+(function(){
+  try { var r=localStorage.getItem('fb_car_'+ROOM); if(r) _carCache=JSON.parse(r); } catch(e){}
+})();
 
 function toArr(v){ if(!v) return []; if(Array.isArray(v)) return v; return Object.values(v); }
 function getData(){
@@ -3199,28 +3212,9 @@ async function shareHomeScreenshot(){
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  CAR MANAGEMENT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
-var FB_CAR_REF;
 var _carCache = {info:{},loan:{},maintenance:[]};
-var _carReady = false;
 
-function initCarFirebase(){
-  FB_CAR_REF = db.ref('car/' + ROOM);
-  try {
-    var raw = localStorage.getItem('fb_car_'+ROOM);
-    if(raw) _carCache = JSON.parse(raw);
-  } catch(e){}
-  FB_CAR_REF.on('value', function(snap){
-    var v = snap.val() || {};
-    _carCache = {
-      info: v.info || {},
-      loan: v.loan || {},
-      maintenance: v.maintenance ? (Array.isArray(v.maintenance) ? v.maintenance : Object.values(v.maintenance)) : []
-    };
-    _carReady = true;
-    try { localStorage.setItem('fb_car_'+ROOM, JSON.stringify(_carCache)); } catch(e){}
-    if(curPage==='car') refreshCar();
-  });
-}
+function initCarFirebase(){ /* already initialized at startup */ }
 
 function getCarData(){
   var c = _carCache || {};
