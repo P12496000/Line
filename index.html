@@ -1677,8 +1677,15 @@ FB_EV_REF.on('value', snap => {
 }, err => {
   showToast('EV錯誤：' + err.code);
 });
+// 先從 localStorage 預載，讓頁面立刻有資料顯示
+(function(){
+  try { var r=localStorage.getItem('fb_car_'+ROOM); if(r) _carCache=JSON.parse(r); } catch(e){}
+})();
+
+// Firebase 即時監聽，收到更新就覆蓋並重新渲染
 FB_CAR_REF.on('value', function(snap){
-  var v = snap.val() || {};
+  var v = snap.val();
+  if(!v) return; // Firebase 無資料時不覆蓋本機快取
   _carCache = {
     info: v.info || {},
     loan: v.loan || {},
@@ -1686,12 +1693,10 @@ FB_CAR_REF.on('value', function(snap){
     loanPayments: v.loanPayments || {}
   };
   try { localStorage.setItem('fb_car_'+ROOM, JSON.stringify(_carCache)); } catch(e){}
-  if(curPage==='car') refreshCar();
-  updateLoanPayUI();
+  refreshCar();
+}, function(err){
+  console.warn('FB_CAR_REF error:', err.code);
 });
-(function(){
-  try { var r=localStorage.getItem('fb_car_'+ROOM); if(r) _carCache=JSON.parse(r); } catch(e){}
-})();
 
 function toArr(v){ if(!v) return []; if(Array.isArray(v)) return v; return Object.values(v); }
 function getData(){
@@ -3270,17 +3275,15 @@ function getCarData(){
   };
 }
 function saveCarData(d){
-  // 合併進現有 _carCache，防止部分欄位被覆蓋清空
-  _carCache = Object.assign({}, _carCache, d);
-  // 用 update 而非 set，只更新有傳入的欄位，保護 Firebase 上其他欄位
-  if(FB_CAR_REF){
-    var updateObj = {};
-    if(d.info       !== undefined) updateObj['info']        = d.info;
-    if(d.loan       !== undefined) updateObj['loan']        = d.loan;
-    if(d.maintenance!== undefined) updateObj['maintenance'] = d.maintenance;
-    if(d.loanPayments!==undefined) updateObj['loanPayments']= d.loanPayments;
-    FB_CAR_REF.update(updateObj);
-  }
+  // 深度合併，確保每次寫入都是完整資料
+  _carCache = {
+    info:         (d.info         !== undefined) ? d.info         : (_carCache.info         || {}),
+    loan:         (d.loan         !== undefined) ? d.loan         : (_carCache.loan         || {}),
+    maintenance:  (d.maintenance  !== undefined) ? d.maintenance  : (_carCache.maintenance  || []),
+    loanPayments: (d.loanPayments !== undefined) ? d.loanPayments : (_carCache.loanPayments || {})
+  };
+  // 用 set 寫整筆，Firebase Realtime DB 對陣列最穩定
+  if(FB_CAR_REF) FB_CAR_REF.set(_carCache);
   try { localStorage.setItem('fb_car_'+ROOM, JSON.stringify(_carCache)); } catch(e){}
 }
 
