@@ -1681,10 +1681,12 @@ FB_CAR_REF.on('value', function(snap){
   _carCache = {
     info: v.info || {},
     loan: v.loan || {},
-    maintenance: v.maintenance ? (Array.isArray(v.maintenance) ? v.maintenance : Object.values(v.maintenance)) : []
+    maintenance: v.maintenance ? (Array.isArray(v.maintenance) ? v.maintenance : Object.values(v.maintenance)) : [],
+    loanPayments: v.loanPayments || {}
   };
   try { localStorage.setItem('fb_car_'+ROOM, JSON.stringify(_carCache)); } catch(e){}
   if(curPage==='car') refreshCar();
+  updateLoanPayUI();
 });
 (function(){
   try { var r=localStorage.getItem('fb_car_'+ROOM); if(r) _carCache=JSON.parse(r); } catch(e){}
@@ -3262,7 +3264,8 @@ function getCarData(){
   return {
     info: c.info || {},
     loan: c.loan || {},
-    maintenance: Array.isArray(c.maintenance) ? c.maintenance : Object.values(c.maintenance||{})
+    maintenance: Array.isArray(c.maintenance) ? c.maintenance : Object.values(c.maintenance||{}),
+    loanPayments: c.loanPayments || {}
   };
 }
 function saveCarData(d){
@@ -3499,25 +3502,33 @@ async function testNtfy(){
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  LOAN MONTHLY PAYMENT TRACKING
+//  LOAN MONTHLY PAYMENT TRACKING  (Firebase 跨設備同步)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
-function _loanPayKey(){
+function _loanPayMonthKey(){
   var now = new Date();
-  return 'loanPay_' + ROOM + '_' + now.getFullYear() + '_' + String(now.getMonth()+1).padStart(2,'0');
+  return now.getFullYear() + '_' + String(now.getMonth()+1).padStart(2,'0');
 }
 
 function getLoanPayStatus(){
-  return localStorage.getItem(_loanPayKey()) === 'paid';
+  var d = getCarData();
+  var payments = d.loanPayments || {};
+  return payments[_loanPayMonthKey()] === 'paid';
 }
 
 function confirmLoanPayment(){
-  localStorage.setItem(_loanPayKey(), 'paid');
+  var d = getCarData();
+  if(!d.loanPayments) d.loanPayments = {};
+  d.loanPayments[_loanPayMonthKey()] = 'paid';
+  saveCarData(d);
   updateLoanPayUI();
   showToast('✅ 已確認本月貸款已繳費！');
 }
 
 function undoLoanPayment(){
-  localStorage.removeItem(_loanPayKey());
+  var d = getCarData();
+  if(!d.loanPayments) d.loanPayments = {};
+  delete d.loanPayments[_loanPayMonthKey()];
+  saveCarData(d);
   updateLoanPayUI();
   showToast('↩ 已取消本月繳費確認');
 }
