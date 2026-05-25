@@ -929,9 +929,9 @@
     </div>
   </div>
   <div style="padding:14px 16px 8px;cursor:pointer;" onclick="toggleMaintenanceForm()">
-    <div class="section-title" style="padding:0">&#128295; 新增保養記錄 <span id="maintFormArrow" style="font-size:0.8rem;color:var(--soft);">&#9660; 展開新增</span></div>
+    <div class="section-title" style="padding:0">&#128295; 保養明細紀錄 <span id="maintFormArrow" style="font-size:0.8rem;color:var(--soft);">&#9660; 展開新增</span></div>
   </div>
-  <div style="padding:0 16px 16px;display:none;" id="maintFormWrap">
+  <div style="padding:0 16px 10px;display:none;" id="maintFormWrap">
     <div class="list-card" style="margin:0;padding:16px;">
       <div class="field-label">保養日期</div>
       <input class="field-input" type="date" id="maintDate">
@@ -941,6 +941,8 @@
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
         <div class="maint-tag sel" onclick="toggleMaintTag(this,'機油更換')">&#128738; 機油更換</div>
         <div class="maint-tag" onclick="toggleMaintTag(this,'輪胎更換')">&#128260; 輪胎更換</div>
+        <div class="maint-tag" onclick="toggleMaintTag(this,'調胎')">&#128260; 調胎</div>
+        <div class="maint-tag" onclick="toggleMaintTag(this,'四輪定位')">&#127919; 四輪定位</div>
         <div class="maint-tag" onclick="toggleMaintTag(this,'煞車保養')">&#128721; 煞車保養</div>
         <div class="maint-tag" onclick="toggleMaintTag(this,'空調清洗')">&#10052; 空調清洗</div>
         <div class="maint-tag" onclick="toggleMaintTag(this,'大保養')">&#9881; 大保養</div>
@@ -954,8 +956,7 @@
       <button class="action-btn btn-mint" style="margin-top:4px;" onclick="addMaintenanceRecord()">＋ 新增保養記錄</button>
     </div>
   </div>
-  <div class="section-title">&#128295; 保養明細紀錄</div>
-  <div class="list-card" id="maintList" style="margin-bottom:22px;"></div>
+  <div class="list-card" id="maintList" style="margin:0 13px 22px;"></div>
 </div>
 
 <!-- ══ SETTINGS ══ -->
@@ -3137,11 +3138,11 @@ async function shareHomeScreenshot(){
     if(fab) fab.style.display = 'none';
     if(topNav) topNav.style.display = 'none';
 
-    const page = document.getElementById('page-home');
+    // 截取目前顯示的頁面，不限於首頁
+    const page = document.getElementById('page-' + curPage) || document.getElementById('page-home');
     const pageH = page.scrollHeight;
     const pageW = page.offsetWidth;
 
-    // Capture page content
     const pageCanvas = await html2canvas(page, {
       backgroundColor: null,
       scale: 2,
@@ -3158,27 +3159,26 @@ async function shareHomeScreenshot(){
     if(fab) fab.style.display = prevFab;
     if(topNav) topNav.style.display = prevNav;
 
-    // Composite: bg gradient + page content
     const out = document.createElement('canvas');
     out.width = pageCanvas.width;
     out.height = pageCanvas.height;
     const oc = out.getContext('2d');
-    // Draw gradient background
     const g = oc.createLinearGradient(0, 0, out.width, out.height);
     g.addColorStop(0, '#FFF5F8');
     g.addColorStop(0.45, '#FFF8F2');
     g.addColorStop(1, '#F5FFF8');
     oc.fillStyle = g;
     oc.fillRect(0, 0, out.width, out.height);
-    // Draw page on top
     oc.drawImage(pageCanvas, 0, 0);
 
     out.toBlob(async (blob) => {
       const mo = document.getElementById('navMonth').textContent;
-      const fileName = `家庭公費_${mo}.png`;
+      const pageNames = {home:'首頁', ev:'電車電費', car:'電車管理', settings:'設定'};
+      const pageName = pageNames[curPage] || curPage;
+      const fileName = `家庭公費_${pageName}_${mo}.png`;
       if(navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'image/png' })] })){
         const file = new File([blob], fileName, { type: 'image/png' });
-        await navigator.share({ files: [file], title: `家庭公費 ${mo}` });
+        await navigator.share({ files: [file], title: `家庭公費 ${pageName}` });
         showToast('🌸 已開啟分享！');
       } else {
         const url = URL.createObjectURL(blob);
