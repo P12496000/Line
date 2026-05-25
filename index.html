@@ -971,46 +971,6 @@
 
 <!-- ══ SETTINGS ══ -->
 <div class="page" id="page-settings">
-  <!-- LINE 通知（預設隱藏，點標題展開） -->
-  <div style="padding:14px 16px 4px;">
-    <div style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:6px 2px 8px;" onclick="toggleLineSection()">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="item-icon plain" style="background:#e8f8ee;border-color:#06C755;width:32px;height:32px;font-size:1rem;border-radius:10px;flex-shrink:0;">📨</div>
-        <div>
-          <div style="font-family:'Fredoka One';font-size:0.95rem;color:var(--text);">LINE 通知</div>
-          <div style="font-size:0.75rem;color:var(--soft);" id="lineToggleLabel">已開啟</div>
-        </div>
-      </div>
-      <span id="lineSectionArrow" style="font-size:0.75rem;color:var(--soft);">▾ 展開</span>
-    </div>
-    <div id="lineSectionWrap" style="display:none;">
-      <div class="list-card" style="margin:0;">
-        <div class="list-item" style="justify-content:space-between;align-items:center;">
-          <div style="font-family:'Fredoka One';font-size:0.9rem;color:var(--text);">開啟 LINE 群組通知</div>
-          <label class="line-toggle-wrap">
-            <input type="checkbox" id="lineToggle" onchange="toggleLineNotify(this.checked)">
-            <span class="line-toggle-slider"></span>
-          </label>
-        </div>
-        <!-- LINE 群組 ID 設定 -->
-        <div style="padding:12px 15px 14px;border-top:2px solid var(--pink-pale);">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <div style="font-family:'Fredoka One';font-size:0.88rem;color:var(--text);">👥 LINE 群組 ID</div>
-            <div id="lineGroupIdStatus" style="font-size:0.75rem;color:var(--soft);">⚠️ 尚未設定</div>
-          </div>
-          <div style="font-size:0.73rem;color:var(--soft);margin-bottom:10px;line-height:1.5;">
-            將 Bot 加入群組後，傳送 <strong style="color:var(--pink);">/groupid</strong> 取得群組 ID，貼上後儲存即可發送到群組。
-          </div>
-          <div style="display:flex;gap:8px;">
-            <input id="lineGroupIdInput" class="field-input"
-              style="margin-bottom:0;flex:1;font-size:0.85rem;padding:10px 12px;"
-              placeholder="C 開頭的群組 ID..." maxlength="80">
-            <button onclick="saveLineGroupId()" class="add-member-btn">💾 儲存</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
   <!-- ══ NTFY SETTINGS (預設隱藏，點標題展開) ══ -->
   <div style="padding:8px 16px 4px;">
     <div style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 2px 8px;" onclick="toggleNtfySection()">
@@ -1049,24 +1009,6 @@
     </div>
   </div>
 
-  <div style="padding:8px 16px 8px;">
-    <div class="list-card" style="margin:0;">
-      <div class="list-item" style="justify-content:space-between;align-items:center;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div class="item-icon plain" style="background:#fff3e0;border-color:#ffb74d;">🎬</div>
-          <div>
-            <div class="item-name">支出動畫時間</div>
-            <div class="item-date" id="animDurLabel">3 秒</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <button onclick="changeAnimDur(-1)" style="width:32px;height:32px;border-radius:50%;border:2px solid #E8D0DC;background:white;font-size:1.1rem;cursor:pointer;font-family:'Fredoka One';">－</button>
-          <span id="animDurVal" style="font-family:'Fredoka One';font-size:1.1rem;color:var(--pink);min-width:20px;text-align:center;">3</span>
-          <button onclick="changeAnimDur(1)" style="width:32px;height:32px;border-radius:50%;border:2px solid #E8D0DC;background:white;font-size:1.1rem;cursor:pointer;font-family:'Fredoka One';">＋</button>
-        </div>
-      </div>
-    </div>
-  </div>
   <!-- 跨設備同步（預設隱藏，點標題展開） -->
   <div style="padding:8px 16px 4px;">
     <div style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:6px 2px 8px;" onclick="toggleSyncSection()">
@@ -1674,9 +1616,8 @@ function _tryHideLoading(){
 function _doRefresh(){
   if(document.readyState === 'complete' || document.readyState === 'interactive'){
     refreshAll();
-    initLineToggle();
   } else {
-    document.addEventListener('DOMContentLoaded', ()=>{ refreshAll(); initLineToggle(); });
+    document.addEventListener('DOMContentLoaded', ()=>{ refreshAll(); });
   }
 }
 
@@ -2358,8 +2299,7 @@ function refreshStats(){
 //  SETTINGS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 function refreshSettings(){
-  initLineToggle();
-  initAnimDur();
+  initLineGroupId();
   initNtfyUI();
   const d=getData();
   var sb=document.getElementById('shareBox');
@@ -3229,22 +3169,13 @@ function incomeAnimation(){
   if(img.complete) requestAnimationFrame(tick);
 }
 
-// LINE notify toggle (persisted in localStorage) — 預設開啟
+// LINE 通知：永遠開啟（通過確認視窗控制是否發送）
+const lineNotifyEnabled = true;
 const _DEFAULT_LINE_GROUP_ID = 'C6968ec8b65659553d0f6786f7d7e5a16';
-// 若從未設定過群組 ID，預填預設值
 if(!localStorage.getItem('lineGroupId')){
   localStorage.setItem('lineGroupId', _DEFAULT_LINE_GROUP_ID);
 }
-// lineNotifyEnabled 預設 true（只有明確設為 'false' 才關閉）
-let lineNotifyEnabled = localStorage.getItem('lineNotifyEnabled') !== 'false';
 
-function toggleLineSection(){
-  var wrap = document.getElementById('lineSectionWrap');
-  var arrow = document.getElementById('lineSectionArrow');
-  var open = wrap.style.display === 'none' || wrap.style.display === '';
-  wrap.style.display = open ? 'block' : 'none';
-  arrow.textContent = open ? '▴ 收起' : '▾ 展開';
-}
 function toggleSyncSection(){
   var wrap = document.getElementById('syncSectionWrap');
   var arrow = document.getElementById('syncSectionArrow');
@@ -3253,60 +3184,12 @@ function toggleSyncSection(){
   arrow.textContent = open ? '▴ 收起' : '▾ 展開';
 }
 
-// Run initLineToggle as soon as DOM is ready (independent of Firebase)
-if(document.readyState === 'complete' || document.readyState === 'interactive'){
-  initLineToggle();
-} else {
-  document.addEventListener('DOMContentLoaded', initLineToggle);
-}
 
-// Animation duration (seconds, 1-6, persisted)
-let animDurSecs = parseInt(localStorage.getItem('animDurSecs') || '3');
 
-function changeAnimDur(delta){
-  animDurSecs = Math.max(1, Math.min(6, animDurSecs + delta));
-  localStorage.setItem('animDurSecs', animDurSecs);
-  initAnimDur();
-  showToast('🎬 動畫時間：' + animDurSecs + ' 秒');
-}
-function initAnimDur(){
-  const val = document.getElementById('animDurVal');
-  const lbl = document.getElementById('animDurLabel');
-  if(val) val.textContent = animDurSecs;
-  if(lbl) lbl.textContent = animDurSecs + ' 秒';
-}
+// Animation duration fixed at 2 seconds
+const animDurSecs = 2;
 
-function toggleLineNotify(enabled){
-  lineNotifyEnabled = enabled;
-  localStorage.setItem('lineNotifyEnabled', enabled ? 'true' : 'false');
-  const lbl = document.getElementById('lineToggleLabel');
-  if(lbl) lbl.textContent = enabled ? '已開啟' : '已關閉';
-  _syncLineSettingsUI(enabled);
-  showToast(enabled ? '🔔 LINE 通知已開啟' : '🔕 LINE 通知已關閉');
-}
 
-function _syncLineSettingsUI(enabled){
-  // Dim the group-ID section when notifications are off
-  const groupSection = document.getElementById('lineGroupIdInput');
-  const saveBtn = groupSection && groupSection.parentNode && groupSection.parentNode.querySelector('button');
-  if(groupSection){
-    groupSection.disabled = !enabled;
-    groupSection.style.opacity = enabled ? '1' : '0.45';
-  }
-  if(saveBtn){
-    saveBtn.disabled = !enabled;
-    saveBtn.style.opacity = enabled ? '1' : '0.45';
-  }
-}
-
-function initLineToggle(){
-  const cb = document.getElementById('lineToggle');
-  const lbl = document.getElementById('lineToggleLabel');
-  if(cb){ cb.checked = lineNotifyEnabled; }
-  if(lbl){ lbl.textContent = lineNotifyEnabled ? '已開啟' : '已關閉'; }
-  _syncLineSettingsUI(lineNotifyEnabled);
-  initLineGroupId();
-}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  SHARE HOME SCREENSHOT
@@ -3808,9 +3691,9 @@ function renderMaintenanceList(d){
       (r.note?'<div style="font-size:0.68rem;color:var(--soft);">📝 '+r.note+'</div>':'')+
     '</div>';
   }).join('');
-  el.innerHTML='<div style="padding:7px 14px 5px;display:flex;justify-content:space-between;border-bottom:1.5px solid var(--pink-pale);">'+
+  el.innerHTML='<div style="padding:7px 14px 5px;display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid var(--pink-pale);">'+
     '<span style="font-size:0.75rem;color:var(--soft);">共'+records.length+'筆記錄</span>'+
-    '<span style="font-family:\'Fredoka One\';font-size:0.85rem;color:var(--exp);">累計 $'+totalCost.toLocaleString()+'</span></div>'+rows;
+    '<span style="font-family:\'Fredoka One\';font-size:1.1rem;color:var(--exp);">累計 $'+totalCost.toLocaleString()+'</span></div>'+rows;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
