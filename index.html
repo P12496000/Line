@@ -1004,8 +1004,13 @@
       </div>
     </div>
   </div>
-  <!-- ══ NTFY SETTINGS ══ -->
+  <!-- ══ NTFY SETTINGS (預設隱藏，點標題展開) ══ -->
   <div style="padding:8px 16px 4px;">
+    <div style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 2px 8px;" onclick="toggleNtfySection()">
+      <span style="font-size:0.82rem;color:var(--soft);font-family:'Fredoka One';">🔔 ntfy 推播通知設定</span>
+      <span id="ntfySectionArrow" style="font-size:0.75rem;color:var(--soft);">▾ 展開</span>
+    </div>
+    <div id="ntfySectionWrap" style="display:none;">
     <div class="list-card" style="margin:0;">
       <div class="list-item" style="justify-content:space-between;align-items:center;">
         <div style="display:flex;align-items:center;gap:10px;">
@@ -1033,6 +1038,7 @@
         </div>
         <button onclick="testNtfy()" class="action-btn" style="background:#e8f0ff;color:#3a5fcf;border-color:#6b8cff;box-shadow:2px 2px 0 #3a5fcf;margin-top:10px;margin-bottom:0;">📨 測試發送</button>
       </div>
+    </div>
     </div>
   </div>
 
@@ -1211,6 +1217,19 @@
 </div>
 
 <!-- MONTH PICKER -->
+<!-- ══ LINE NOTIFY CONFIRM MODAL ══ -->
+<div class="modal-overlay center" id="lineNotifyConfirmModal">
+  <div class="modal-sheet center-sheet" style="text-align:center;">
+    <div style="font-size:2.2rem;margin-bottom:8px;">📨</div>
+    <div style="font-family:'Fredoka One',cursive;font-size:1.1rem;margin-bottom:6px;color:var(--text);">要通知 LINE 群組嗎？</div>
+    <div style="font-size:0.82rem;color:var(--soft);margin-bottom:18px;" id="lineNotifyConfirmDetail"></div>
+    <div class="pay-btn-row" style="margin-top:0;">
+      <button class="pay-btn cancel" id="lineNotifyNoBtn">不用了</button>
+      <button class="pay-btn confirm" id="lineNotifyYesBtn">📩 發送通知</button>
+    </div>
+  </div>
+</div>
+
 <div class="month-overlay" id="monthOv" onclick="if(event.target.id==='monthOv')closeMonthPicker()">
   <div class="month-picker">
     <h3>📅 選擇月份</h3>
@@ -1786,10 +1805,11 @@ function confirmPay(){
   document.getElementById('payModal').classList.remove('show');
   payTarget=null;
   const bal1=calcBalance(getData(),curMonth);
-  sendLineNotify(buildLineMsg('income',avatar,memberName,amt,bal1));
+  const lineMsg1=buildLineMsg('income',avatar,memberName,amt,bal1);
   showToast('🌸 '+memberName+' 繳費 $'+amt.toLocaleString()+' 入帳！');
   setTimeout(incomeAnimation, 100);
   refreshAll();
+  showLineNotifyConfirm('💰 '+memberName+' 繳費 $'+amt.toLocaleString(), ()=>sendLineNotify(lineMsg1));
 }
 function confirmUnpay(){
   if(evPayTarget){confirmEvUnpay();return;}
@@ -1805,9 +1825,10 @@ function confirmUnpay(){
     d.entries[curMonth]=d.entries[curMonth].filter(e=>e.id!==entryId);
     save(d);
     const bal=calcBalance(getData(),curMonth);
-    sendLineNotify(buildLineMsg('expense','🗑️','取消繳費：'+memberName,amt,bal));
+    const lineMsg=buildLineMsg('expense','🗑️','取消繳費：'+memberName,amt,bal);
     showToast('🗑️ 已取消 '+memberName+' 的繳費');
     refreshAll();
+    showLineNotifyConfirm('🗑️ 取消繳費：'+memberName+'  $'+amt.toLocaleString(), ()=>sendLineNotify(lineMsg));
   });
 }
 document.getElementById('payModal').addEventListener('click',e=>{if(e.target.id==='payModal'){closePayModal();evPayTarget=null;}});
@@ -1860,9 +1881,10 @@ function confirmEvPay(){
   document.getElementById('payModal').classList.remove('show');
   evPayTarget=null;
   const bal3=calcBalance(getData(),targetMonth);
-  sendLineNotify(buildLineMsg('income','⚡',record.label,amt,bal3));
+  const lineMsg3=buildLineMsg('income','⚡',record.label,amt,bal3);
   showToast('⚡ 電車電費 $'+amt.toLocaleString()+' 已入帳！');
   refreshAll();
+  showLineNotifyConfirm('⚡ '+record.label+'  $'+amt.toLocaleString(), ()=>sendLineNotify(lineMsg3));
 }
 function confirmEvUnpay(){
   if(!evPayTarget||!evPayTarget.entryId)return;
@@ -2004,7 +2026,7 @@ function doSaveEntry(){
   }
   save(d);
   const bal2=calcBalance(getData(),curMonth);
-  sendLineNotify(buildLineMsg(lineType,lineIcon,lineName,amount,bal2));
+  const lineMsg2 = buildLineMsg(lineType,lineIcon,lineName,amount,bal2);
   numStr='0';numExpr='';
   document.getElementById('amNum').textContent='0';
   document.getElementById('amNote').value='';
@@ -2013,6 +2035,8 @@ function doSaveEntry(){
   if(lineType==='expense') setTimeout(moneyFlyAnimation, 100);
   if(lineType==='income') setTimeout(incomeAnimation, 100);
   showToast('✅ 記帳成功！');refreshAll();
+  const notifyDetail2 = (lineType==='expense'?'💸 支出':'💰 收入') + '：' + lineName + '  $' + amount.toLocaleString();
+  showLineNotifyConfirm(notifyDetail2, ()=>sendLineNotify(lineMsg2));
 }
 function delEntry(id){
   showConfirm('刪除這筆記錄？','🗑️',()=>{
@@ -2023,7 +2047,9 @@ function delEntry(id){
     if(entry){
       const bal=calcBalance(getData(),curMonth);
       const name=entry.type==='expense'?(entry.cat+(entry.note?'：'+entry.note:'')):(entry.note||'其他收入');
-      sendLineNotify(buildLineMsg(entry.type,'🗑️','已刪除：'+name,entry.amount,bal));
+      const lineMsg=buildLineMsg(entry.type,'🗑️','已刪除：'+name,entry.amount,bal);
+      const notifyDetail='🗑️ 刪除：'+name+'  $'+entry.amount.toLocaleString();
+      showLineNotifyConfirm(notifyDetail, ()=>sendLineNotify(lineMsg));
     }
     refreshAll();
   });
@@ -3032,6 +3058,24 @@ function saveLineGroupId(){
   showToast('✅ LINE 群組 ID 已儲存！');
 }
 
+// ─── LINE 通知確認視窗 ───
+function showLineNotifyConfirm(detail, sendFn){
+  if(!lineNotifyEnabled){ return; } // 若通知已關閉，直接略過
+  const groupId = getLineGroupId();
+  if(!groupId){ return; } // 未設群組 ID 略過
+  document.getElementById('lineNotifyConfirmDetail').textContent = detail;
+  const modal = document.getElementById('lineNotifyConfirmModal');
+  modal.classList.add('show');
+  const yesBtn = document.getElementById('lineNotifyYesBtn');
+  const noBtn  = document.getElementById('lineNotifyNoBtn');
+  const newYes = yesBtn.cloneNode(true);
+  const newNo  = noBtn.cloneNode(true);
+  yesBtn.parentNode.replaceChild(newYes, yesBtn);
+  noBtn.parentNode.replaceChild(newNo, noBtn);
+  newYes.addEventListener('click', ()=>{ modal.classList.remove('show'); sendFn(); });
+  newNo.addEventListener('click',  ()=>{ modal.classList.remove('show'); });
+}
+
 async function sendLineNotify(msg){
   if(!lineNotifyEnabled) return;
   const groupId = getLineGroupId();
@@ -3169,7 +3213,13 @@ function incomeAnimation(){
   if(img.complete) requestAnimationFrame(tick);
 }
 
-// LINE notify toggle (persisted in localStorage)
+// LINE notify toggle (persisted in localStorage) — 預設開啟
+const _DEFAULT_LINE_GROUP_ID = 'C6968ec8b65659553d0f6786f7d7e5a16';
+// 若從未設定過群組 ID，預填預設值
+if(!localStorage.getItem('lineGroupId')){
+  localStorage.setItem('lineGroupId', _DEFAULT_LINE_GROUP_ID);
+}
+// lineNotifyEnabled 預設 true（只有明確設為 'false' 才關閉）
 let lineNotifyEnabled = localStorage.getItem('lineNotifyEnabled') !== 'false';
 
 // Run initLineToggle as soon as DOM is ready (independent of Firebase)
@@ -3496,6 +3546,14 @@ function initNtfyUI(){
   if(lbl) lbl.textContent = _ntfyEnabled ? '已開啟' : '已關閉';
   if(srv) srv.value = _ntfyServer;
   if(top) top.value = _ntfyTopic;
+}
+
+function toggleNtfySection(){
+  var wrap = document.getElementById('ntfySectionWrap');
+  var arrow = document.getElementById('ntfySectionArrow');
+  var open = wrap.style.display === 'none' || wrap.style.display === '';
+  wrap.style.display = open ? 'block' : 'none';
+  arrow.textContent = open ? '▴ 收起' : '▾ 展開';
 }
 
 function toggleNtfy(enabled){
