@@ -935,8 +935,9 @@
     </div>
   </div>
   <div class="list-card" id="maintList" style="margin:0 13px 22px;"></div>
-  <div style="padding:14px 16px 8px;cursor:pointer;" onclick="toggleLoanForm()">
+  <div style="padding:14px 16px 8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleLoanForm()">
     <div class="section-title" style="padding:0">&#128179; 貸款設定 <span id="loanFormArrow" style="font-size:0.8rem;color:var(--soft);">&#9660; 展開設定</span></div>
+    <button onclick="event.stopPropagation();diagCarData()" style="font-size:0.72rem;padding:4px 10px;border-radius:20px;border:1.5px solid #aaa;background:#f8f8f8;color:#666;cursor:pointer;">🔍 診斷</button>
   </div>
   <div style="padding:0 16px 16px;display:none;" id="loanFormWrap">
     <div class="list-card" style="margin:0;padding:16px;">
@@ -3269,9 +3270,18 @@ function getCarData(){
   };
 }
 function saveCarData(d){
-  _carCache = d;
-  if(FB_CAR_REF) FB_CAR_REF.set(d);
-  try { localStorage.setItem('fb_car_'+ROOM, JSON.stringify(d)); } catch(e){}
+  // 合併進現有 _carCache，防止部分欄位被覆蓋清空
+  _carCache = Object.assign({}, _carCache, d);
+  // 用 update 而非 set，只更新有傳入的欄位，保護 Firebase 上其他欄位
+  if(FB_CAR_REF){
+    var updateObj = {};
+    if(d.info       !== undefined) updateObj['info']        = d.info;
+    if(d.loan       !== undefined) updateObj['loan']        = d.loan;
+    if(d.maintenance!== undefined) updateObj['maintenance'] = d.maintenance;
+    if(d.loanPayments!==undefined) updateObj['loanPayments']= d.loanPayments;
+    FB_CAR_REF.update(updateObj);
+  }
+  try { localStorage.setItem('fb_car_'+ROOM, JSON.stringify(_carCache)); } catch(e){}
 }
 
 function toggleCarInfoForm(){
@@ -3294,24 +3304,26 @@ function toggleMaintenanceForm(){
 }
 
 function saveCarInfo(){
-  var d=getCarData();
-  d.info={
+  var info={
     plate:document.getElementById('carPlate').value.trim(),
     model:document.getElementById('carModel').value.trim(),
     year:parseInt(document.getElementById('carYear').value)||0,
     buyDate:document.getElementById('carBuyDate').value
   };
-  saveCarData(d); showToast('🚗 車輛資訊已儲存！'); refreshCar();
+  _carCache.info = info;
+  saveCarData(_carCache);
+  showToast('🚗 車輛資訊已儲存！'); refreshCar();
 }
 function saveLoanInfo(){
-  var d=getCarData();
-  d.loan={
+  var loan={
     total:parseFloat(document.getElementById('loanTotal').value)||0,
     monthly:parseFloat(document.getElementById('loanMonthly').value)||0,
     startDate:document.getElementById('loanStartDate').value,
     termMonths:parseInt(document.getElementById('loanTermMonths').value)||0
   };
-  saveCarData(d); showToast('💳 貸款資訊已儲存！'); refreshCar();
+  _carCache.loan = loan;
+  saveCarData(_carCache);
+  showToast('💳 貸款資訊已儲存！'); refreshCar();
 }
 
 var _selMaintTags=['機油更換'];
@@ -3324,15 +3336,15 @@ function toggleMaintTag(el,tag){
 function addMaintenanceRecord(){
   var date=document.getElementById('maintDate').value;
   if(!date){showToast('請選擇保養日期 🗓️');return;}
-  var d=getCarData();
-  d.maintenance.push({
+  if(!_carCache.maintenance) _carCache.maintenance=[];
+  _carCache.maintenance.push({
     id:Date.now(),date:date,
     mileage:parseFloat(document.getElementById('maintMileage').value)||0,
     types:_selMaintTags.slice(),
     note:document.getElementById('maintNote').value.trim(),
     cost:parseFloat(document.getElementById('maintCost').value)||0
   });
-  saveCarData(d);
+  saveCarData(_carCache);
   document.getElementById('maintDate').value='';
   document.getElementById('maintMileage').value='';
   document.getElementById('maintNote').value='';
@@ -3345,9 +3357,8 @@ function addMaintenanceRecord(){
 }
 function delMaintenanceRecord(id){
   showConfirm('刪除此筆保養記錄？','🔧',function(){
-    var d=getCarData();
-    d.maintenance=d.maintenance.filter(function(r){return r.id!==id;});
-    saveCarData(d); refreshCar(); showToast('🗑️ 已刪除');
+    _carCache.maintenance=(_carCache.maintenance||[]).filter(function(r){return r.id!==id;});
+    saveCarData(_carCache); refreshCar(); showToast('🗑️ 已刪除');
   });
 }
 
@@ -3459,46 +3470,66 @@ function saveNtfySettings(){
   showToast('💾 ntfy 設定已儲存！');
 }
 
+function _ntfyImgPing(url){
+  // 用 no-cors image ping 繞過 CORS，ntfy 收到 GET 即發通知
+  return new Promise(function(resolve){
+    var img = new Image();
+    img.onload = img.onerror = function(){ resolve(); };
+    img.src = url + '?ts=' + Date.now();
+    setTimeout(resolve, 4000);
+  });
+}
+
 async function sendNtfy(title, message, priority){
   if(!_ntfyEnabled) return;
   if(!_ntfyTopic)   return;
+  var base = _ntfyServer.replace(/\/+$/, '') + '/' + _ntfyTopic;
+  // 嘗試 no-cors POST（部分瀏覽器支援）
   try {
-    var url = _ntfyServer.replace(/\/+$/, '') + '/' + _ntfyTopic;
-    await fetch(url, {
+    await fetch(base, {
       method: 'POST',
+      mode: 'no-cors',
       headers: {
-        'Title': title,
+        'Title': encodeURIComponent(title),
         'Priority': priority || 'high',
-        'Tags': 'money_with_wings',
-        'Content-Type': 'text/plain; charset=utf-8'
+        'Tags': 'money_with_wings'
       },
       body: message
     });
-  } catch(e) {
-    console.warn('ntfy send failed:', e);
-  }
+    return;
+  } catch(e){}
+  // Fallback：GET image ping（訊息放 URL）
+  var msg = encodeURIComponent(message.substring(0, 200));
+  var getUrl = base + '?title=' + encodeURIComponent(title) + '&message=' + msg + '&priority=' + (priority||'high') + '&tags=money_with_wings';
+  await _ntfyImgPing(getUrl);
 }
 
 async function testNtfy(){
   var srv = (document.getElementById('ntfyServer').value||'').trim() || 'https://ntfy.sh';
   var top = (document.getElementById('ntfyTopic').value||'').trim();
   if(!top){ showToast('請先輸入 Topic 🥺'); return; }
+  var base = srv.replace(/\/+$/, '') + '/' + top;
+  var sent = false;
+  // 嘗試 no-cors POST
   try {
-    var url = srv.replace(/\/+$/, '') + '/' + top;
-    await fetch(url, {
+    await fetch(base, {
       method: 'POST',
+      mode: 'no-cors',
       headers: {
-        'Title': '🏠 家庭公費管家 測試通知',
+        'Title': encodeURIComponent('家庭公費管家 測試通知'),
         'Priority': 'default',
-        'Tags': 'white_check_mark',
-        'Content-Type': 'text/plain; charset=utf-8'
+        'Tags': 'white_check_mark'
       },
-      body: 'ntfy 設定成功！貸款繳費提醒已就緒 🎉'
+      body: 'ntfy 設定成功！貸款繳費提醒已就緒'
     });
-    showToast('📨 測試通知已發送！');
-  } catch(e) {
-    showToast('❌ 發送失敗：' + e.message);
+    sent = true;
+  } catch(e){}
+  // Fallback GET
+  if(!sent){
+    var getUrl = base + '?title=' + encodeURIComponent('家庭公費管家 測試通知') + '&message=' + encodeURIComponent('ntfy 設定成功！貸款繳費提醒已就緒') + '&tags=white_check_mark';
+    await _ntfyImgPing(getUrl);
   }
+  showToast('📨 測試通知已發送，請確認手機！');
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -3516,19 +3547,17 @@ function getLoanPayStatus(){
 }
 
 function confirmLoanPayment(){
-  var d = getCarData();
-  if(!d.loanPayments) d.loanPayments = {};
-  d.loanPayments[_loanPayMonthKey()] = 'paid';
-  saveCarData(d);
+  if(!_carCache.loanPayments) _carCache.loanPayments = {};
+  _carCache.loanPayments[_loanPayMonthKey()] = 'paid';
+  saveCarData(_carCache);
   updateLoanPayUI();
   showToast('✅ 已確認本月貸款已繳費！');
 }
 
 function undoLoanPayment(){
-  var d = getCarData();
-  if(!d.loanPayments) d.loanPayments = {};
-  delete d.loanPayments[_loanPayMonthKey()];
-  saveCarData(d);
+  if(!_carCache.loanPayments) _carCache.loanPayments = {};
+  delete _carCache.loanPayments[_loanPayMonthKey()];
+  saveCarData(_carCache);
   updateLoanPayUI();
   showToast('↩ 已取消本月繳費確認');
 }
@@ -3601,6 +3630,26 @@ function refreshCar(){
     document.addEventListener('DOMContentLoaded', doNtfyInit);
   }
 })();
+
+function diagCarData(){
+  var raw = _carCache || {};
+  var fbUrl = 'https://line-1fb38-default-rtdb.asia-southeast1.firebasedatabase.app/car/' + ROOM + '.json';
+  var info = raw.info || {};
+  var loan = raw.loan || {};
+  var maint = raw.maintenance || [];
+  var pays = raw.loanPayments || {};
+  var msg = '🔍 電車管理資料診斷\n';
+  msg += '─────────────\n';
+  msg += '車輛資訊：' + (info.plate ? info.plate + ' / ' + (info.model||'') : '❌ 無資料') + '\n';
+  msg += '貸款設定：' + (loan.total ? '$' + loan.total + '，月繳$' + loan.monthly : '❌ 無資料') + '\n';
+  msg += '保養記錄：' + maint.length + ' 筆\n';
+  msg += '繳費紀錄：' + Object.keys(pays).length + ' 個月\n';
+  msg += '─────────────\n';
+  msg += 'Firebase 路徑：\ncar/' + ROOM + '\n\n';
+  msg += '可直接開以下連結查看原始資料：';
+  var ok = confirm(msg + '\n\n點確定開啟 Firebase 資料連結');
+  if(ok) window.open(fbUrl, '_blank');
+}
 
 function renderMaintenanceList(d){
   var records=d.maintenance.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
