@@ -1057,6 +1057,10 @@
   <div style="padding:14px 16px 4px"><div class="section-title" style="padding:0">🔗 跨設備同步</div></div>
   <div style="padding:0 16px 16px">
     <div class="list-card" style="margin:0;padding:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div id="fbStatusDot" style="width:10px;height:10px;border-radius:50%;background:#ccc;flex-shrink:0;"></div>
+        <div id="fbStatusText" style="font-size:0.78rem;color:var(--soft);">連線檢查中...</div>
+      </div>
       <div style="font-size:0.78rem;color:var(--soft);margin-bottom:10px;line-height:1.6;">
         把下方連結傳給家人，開啟同一個網址就會自動同步所有資料 🌸
       </div>
@@ -3691,6 +3695,25 @@ function renderMaintenanceList(d){
     '<span style="font-size:0.78rem;color:var(--soft);">共'+records.length+'筆記錄</span>'+
     '<span style="font-family:\'Fredoka One\';font-size:0.9rem;color:var(--exp);">累計 $'+totalCost.toLocaleString()+'</span></div>'+rows;
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  FIREBASE CONNECTION STATUS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+db.ref('.info/connected').on('value', function(snap){
+  var connected = snap.val();
+  var dot  = document.getElementById('fbStatusDot');
+  var text = document.getElementById('fbStatusText');
+  if(!dot || !text) return;
+  if(connected){
+    dot.style.background  = '#22aa66';
+    text.textContent = '✅ Firebase 已連線，資料會即時同步';
+    text.style.color = '#22aa66';
+  } else {
+    dot.style.background  = '#ff4444';
+    text.textContent = '❌ Firebase 未連線，請檢查網路';
+    text.style.color = '#ff4444';
+  }
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  CAR FIREBASE INIT  (最後執行，確保 refreshCar 已定義)
