@@ -1054,10 +1054,15 @@
       </div>
     </div>
   </div>
-  <div style="padding:14px 16px 4px"><div class="section-title" style="padding:0">🔗 分享邀請連結</div></div>
+  <div style="padding:14px 16px 4px"><div class="section-title" style="padding:0">🔗 跨設備同步</div></div>
   <div style="padding:0 16px 16px">
-    <div class="share-box" id="shareBox">產生中...</div>
-    <button class="action-btn btn-mint" onclick="copyShare()">📤 複製連結給家人</button>
+    <div class="list-card" style="margin:0;padding:16px;">
+      <div style="font-size:0.78rem;color:var(--soft);margin-bottom:10px;line-height:1.6;">
+        把下方連結傳給家人，開啟同一個網址就會自動同步所有資料 🌸
+      </div>
+      <div class="share-box" id="shareBox" style="font-size:0.78rem;word-break:break-all;margin-bottom:10px;"></div>
+      <button class="action-btn btn-mint" onclick="copyShare()" style="margin-bottom:0;">📤 複製連結給家人</button>
+    </div>
   </div>
   <div style="padding:0 16px 4px"><div class="section-title" style="padding:0">👥 固定成員管理</div></div>
   <div style="padding:0 16px 16px">
@@ -1591,8 +1596,11 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 function getRoomId(){
-  let h=location.hash.replace('#','');
-  if(!h){h='fam_'+Math.random().toString(36).substr(2,8);location.hash=h;}
+  // 完全以 URL hash 為準，沒有 hash 就用預設值
+  // 所有人開同一個網址（含 #xxx）就自動同步
+  let h = location.hash.replace('#','') || 'my-family';
+  h = h.replace(/[^a-zA-Z0-9_一-鿿-]/g, '-');
+  if(h !== location.hash.replace('#','')) location.hash = h;
   return h;
 }
 const ROOM=getRoomId();
@@ -2305,7 +2313,8 @@ function refreshSettings(){
   initLineToggle();
   initAnimDur();
   const d=getData();
-  document.getElementById('shareBox').textContent=location.href.split('#')[0]+'#'+ROOM;
+  var sb=document.getElementById('shareBox');
+  if(sb) sb.textContent=location.href.split('#')[0]+'#'+ROOM;
   document.getElementById('memList').innerHTML=!d.members.length
     ?'<div class="empty" style="padding:16px;"><p>還沒有成員，請新增</p></div>'
     :d.members.map((m,i)=>{
@@ -2417,9 +2426,35 @@ function switchToNowAndAdd(){
 }
 function closeAdd(){document.getElementById('addModal').classList.remove('show');}
 document.getElementById('addModal').addEventListener('click',e=>{if(e.target.id==='addModal')closeAdd();});
+function setRoomName(){
+  var input = document.getElementById('roomNameInput');
+  var name = (input.value||'').trim().replace(/[^a-zA-Z0-9_一-鿿-]/g,'-').toLowerCase();
+  if(!name){ showToast('請輸入家庭名稱 🥺'); return; }
+  showConfirm('套用「' + name + '」？所有設備輸入同一個名稱就能同步。', '🔗', function(){
+    localStorage.setItem('roomId', name);
+    location.hash = name;
+    location.reload();
+  });
+}
+
+function initRoomUI(){
+  var lbl = document.getElementById('currentRoomLabel');
+  var inp = document.getElementById('roomNameInput');
+  if(lbl) lbl.textContent = ROOM;
+  if(inp) inp.value = ROOM;
+}
+
 function copyShare(){
-  navigator.clipboard.writeText(location.href.split('#')[0]+'#'+ROOM)
-    .then(()=>showToast('✅ 連結已複製！快傳給家人 💌'));
+  var url = location.href.split('#')[0]+'#'+ROOM;
+  navigator.clipboard.writeText(url)
+    .then(()=>showToast('✅ 連結已複製！'))
+    .catch(()=>{
+      var el=document.createElement('textarea');
+      el.value=url; document.body.appendChild(el);
+      el.select(); document.execCommand('copy');
+      document.body.removeChild(el);
+      showToast('✅ 連結已複製！');
+    });
 }
 function clearData(){
   showConfirm('清除本月所有記錄？','⚠️',()=>{
