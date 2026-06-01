@@ -1706,6 +1706,26 @@ let curMonth=new Date().toISOString().substr(0,7);
 function moLabel(m){const[y,mo]=m.split('-');return `${y}年 ${parseInt(mo)}月`;}
 function updateNavMo(){document.getElementById('navMonth').textContent=moLabel(curMonth);}
 
+// ── 自動偵測月份切換 ──
+// 當裝置時間跨入新的月份時，若使用者正停留在「當月」頁面，
+// 就自動跳到新月份；若使用者刻意在查看過去月份，則不打斷他。
+let _realMonth = new Date().toISOString().substr(0,7);
+function checkMonthRollover(){
+  const realNow = new Date().toISOString().substr(0,7);
+  if(realNow !== _realMonth){
+    if(curMonth === _realMonth){
+      curMonth = realNow;
+      if(typeof updateNavMo === 'function') updateNavMo();
+      if(typeof refreshAll === 'function') refreshAll();
+    }
+    _realMonth = realNow;
+  }
+}
+// 每分鐘檢查一次；切回前景 / 重新聚焦時也立即檢查
+setInterval(checkMonthRollover, 60000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkMonthRollover(); });
+window.addEventListener('focus', checkMonthRollover);
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  PAY MODAL
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1764,9 +1784,9 @@ function confirmPay(){
   const bal1=calcBalance(getData(),curMonth);
   const lineMsg1=buildLineMsg('income',avatar,memberName,amt,bal1);
   showToast('🌸 '+memberName+' 繳費 $'+amt.toLocaleString()+' 入帳！');
-  setTimeout(incomeAnimation, 100);
   refreshAll();
-  showLineNotifyConfirm('💰 '+memberName+' 繳費 $'+amt.toLocaleString(), ()=>sendLineNotify(lineMsg1));
+  // 先彈出「是否發送通知」彈窗，待使用者選擇後再播放動畫
+  showLineNotifyConfirm('💰 '+memberName+' 繳費 $'+amt.toLocaleString(), ()=>sendLineNotify(lineMsg1), ()=>setTimeout(incomeAnimation, 100));
 }
 function confirmUnpay(){
   if(evPayTarget){confirmEvUnpay();return;}
@@ -1989,11 +2009,14 @@ function doSaveEntry(){
   document.getElementById('amNote').value='';
   document.getElementById('otherIncNote').value='';
   closeAdd();
-  if(lineType==='expense') setTimeout(moneyFlyAnimation, 100);
-  if(lineType==='income') setTimeout(incomeAnimation, 100);
   showToast('✅ 記帳成功！');refreshAll();
   const notifyDetail2 = (lineType==='expense'?'💸 支出':'💰 收入') + '：' + lineName + '  $' + amount.toLocaleString();
-  showLineNotifyConfirm(notifyDetail2, ()=>sendLineNotify(lineMsg2));
+  // 先彈出「是否發送通知」彈窗，待使用者選擇後再播放對應動畫
+  const playAddAnim = ()=>{
+    if(lineType==='expense') setTimeout(moneyFlyAnimation, 100);
+    if(lineType==='income')  setTimeout(incomeAnimation, 100);
+  };
+  showLineNotifyConfirm(notifyDetail2, ()=>sendLineNotify(lineMsg2), playAddAnim);
 }
 function delEntry(id){
   showConfirm('刪除這筆記錄？','🗑️',()=>{
@@ -3015,10 +3038,11 @@ function saveLineGroupId(){
 }
 
 // ─── LINE 通知確認視窗 ───
-function showLineNotifyConfirm(detail, sendFn){
-  if(!lineNotifyEnabled){ return; } // 若通知已關閉，直接略過
+function showLineNotifyConfirm(detail, sendFn, afterFn){
+  const done = (typeof afterFn === 'function') ? afterFn : function(){};
+  if(!lineNotifyEnabled){ done(); return; } // 若通知已關閉，直接略過（仍執行後續動畫）
   const groupId = getLineGroupId();
-  if(!groupId){ return; } // 未設群組 ID 略過
+  if(!groupId){ done(); return; } // 未設群組 ID 略過（仍執行後續動畫）
   document.getElementById('lineNotifyConfirmDetail').textContent = detail;
   const modal = document.getElementById('lineNotifyConfirmModal');
   modal.classList.add('show');
@@ -3028,8 +3052,8 @@ function showLineNotifyConfirm(detail, sendFn){
   const newNo  = noBtn.cloneNode(true);
   yesBtn.parentNode.replaceChild(newYes, yesBtn);
   noBtn.parentNode.replaceChild(newNo, noBtn);
-  newYes.addEventListener('click', ()=>{ modal.classList.remove('show'); sendFn(); });
-  newNo.addEventListener('click',  ()=>{ modal.classList.remove('show'); });
+  newYes.addEventListener('click', ()=>{ modal.classList.remove('show'); sendFn(); done(); });
+  newNo.addEventListener('click',  ()=>{ modal.classList.remove('show'); done(); });
 }
 
 async function sendLineNotify(msg){
